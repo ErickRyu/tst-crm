@@ -23,17 +23,6 @@ export const CRM_PRIORITY: Record<CrmStatus, number> = {
   예약완료: 8,
 };
 
-const TRANSITIONS: Record<CrmStatus, CrmStatus[]> = {
-  신규인입: ["신규인입", "1차부재", "응대중", "통화완료", "예약완료"],
-  "1차부재": ["1차부재", "2차부재", "응대중", "통화완료", "예약완료"],
-  "2차부재": ["2차부재", "3차부재", "응대중", "통화완료", "예약완료"],
-  "3차부재": ["3차부재", "노쇼", "응대중", "통화완료", "예약완료"],
-  노쇼: ["노쇼", "응대중", "통화완료", "예약완료"],
-  응대중: ["응대중", "1차부재", "2차부재", "3차부재", "노쇼", "통화완료", "예약완료"],
-  통화완료: ["통화완료", "예약완료", "응대중"],
-  예약완료: ["예약완료", "응대중"],
-};
-
 function normalizeDate(value: Date | string): Date {
   return value instanceof Date ? value : new Date(value);
 }
@@ -69,6 +58,7 @@ export function calculateSeniorBadge(birthDate: Date | string | null) {
   return { isSenior65Plus, monthsUntil65 };
 }
 
-export function canTransition(from: CrmStatus, to: CrmStatus) {
-  return TRANSITIONS[from]?.includes(to) ?? false;
+export function canTransition(): boolean {
+  // 모든 상태 간 전이를 허용
+  return true;
 }
