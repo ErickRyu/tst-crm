@@ -595,6 +595,8 @@ type LeadCardProps = {
 
 function LeadCard({ lead, users, onStatusChange, onAssigneeChange, onScheduleChange, onSelect, selected, onDragStart, onDragEnd, dragging }: LeadCardProps) {
   const style = statusStyles[lead.crmStatus];
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+
   return (
     <div
       draggable
@@ -655,6 +657,8 @@ function LeadCard({ lead, users, onStatusChange, onAssigneeChange, onScheduleCha
       <div className="flex flex-col gap-2 text-xs">
         <select
           value={lead.crmStatus}
+          onMouseDown={stop}
+          onClick={stop}
           onChange={(e) => onStatusChange(lead.id, e.target.value as CrmStatus)}
           className="w-full rounded-lg border border-[var(--border)] bg-white px-2 py-1 text-xs"
         >
@@ -666,6 +670,8 @@ function LeadCard({ lead, users, onStatusChange, onAssigneeChange, onScheduleCha
         </select>
         <select
           value={lead.assigneeId ?? ""}
+          onMouseDown={stop}
+          onClick={stop}
           onChange={(e) => onAssigneeChange(lead.id, e.target.value ? Number(e.target.value) : null)}
           className="w-full rounded-lg border border-[var(--border)] bg-white px-2 py-1 text-xs"
         >
@@ -680,6 +686,8 @@ function LeadCard({ lead, users, onStatusChange, onAssigneeChange, onScheduleCha
           <input
             type="datetime-local"
             defaultValue={toIsoLocal(lead.followUpAt)}
+            onClick={stop}
+            onMouseDown={stop}
             onBlur={(e) => onScheduleChange(lead.id, "followUpAt", e.target.value)}
             className="w-1/2 rounded-lg border border-[var(--border)] bg-white px-2 py-1 text-xs"
             aria-label="팔로업 예약"
@@ -687,6 +695,8 @@ function LeadCard({ lead, users, onStatusChange, onAssigneeChange, onScheduleCha
           <input
             type="datetime-local"
             defaultValue={toIsoLocal(lead.appointmentAt)}
+            onClick={stop}
+            onMouseDown={stop}
             onBlur={(e) => onScheduleChange(lead.id, "appointmentAt", e.target.value)}
             className="w-1/2 rounded-lg border border-[var(--border)] bg-white px-2 py-1 text-xs"
             aria-label="예약 시간"
@@ -708,6 +718,8 @@ type LeadTableProps = {
 };
 
 function LeadTable({ leads, users, onStatusChange, onAssigneeChange, onScheduleChange, loading, onSelectLead }: LeadTableProps) {
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+
   return (
     <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-white shadow-sm">
       <table className="min-w-full text-left text-sm">
@@ -751,6 +763,8 @@ function LeadTable({ leads, users, onStatusChange, onAssigneeChange, onScheduleC
               <td className="px-3 py-3">
                 <select
                   value={lead.crmStatus}
+                  onMouseDown={stop}
+                  onClick={stop}
                   onChange={(e) => onStatusChange(lead.id, e.target.value as CrmStatus)}
                   className="rounded-lg border border-[var(--border)] bg-white px-2 py-1 text-xs"
                 >
@@ -764,6 +778,8 @@ function LeadTable({ leads, users, onStatusChange, onAssigneeChange, onScheduleC
               <td className="px-3 py-3">
                 <select
                   value={lead.assigneeId ?? ""}
+                  onMouseDown={stop}
+                  onClick={stop}
                   onChange={(e) => onAssigneeChange(lead.id, e.target.value ? Number(e.target.value) : null)}
                   className="rounded-lg border border-[var(--border)] bg-white px-2 py-1 text-xs"
                 >
@@ -779,6 +795,8 @@ function LeadTable({ leads, users, onStatusChange, onAssigneeChange, onScheduleC
                 <input
                   type="datetime-local"
                   defaultValue={toIsoLocal(lead.followUpAt)}
+                  onMouseDown={stop}
+                  onClick={stop}
                   onBlur={(e) => onScheduleChange(lead.id, "followUpAt", e.target.value)}
                   className="rounded-lg border border-[var(--border)] bg-white px-2 py-1 text-xs"
                 />
@@ -787,6 +805,8 @@ function LeadTable({ leads, users, onStatusChange, onAssigneeChange, onScheduleC
                 <input
                   type="datetime-local"
                   defaultValue={toIsoLocal(lead.appointmentAt)}
+                  onMouseDown={stop}
+                  onClick={stop}
                   onBlur={(e) => onScheduleChange(lead.id, "appointmentAt", e.target.value)}
                   className="rounded-lg border border-[var(--border)] bg-white px-2 py-1 text-xs"
                 />
