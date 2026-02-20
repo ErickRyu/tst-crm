@@ -276,10 +276,6 @@ export default function CrmPage() {
       setDraggingId(null);
       return;
     }
-    if (lead.crmStatus === status) {
-      setDraggingId(null);
-      return;
-    }
     await updateStatus(draggingId, status);
     setDraggingId(null);
   }
