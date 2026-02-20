@@ -104,6 +104,8 @@ export default function CrmPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<CrmStatus | null>(null);
 
   const fetchUsers = useCallback(async () => {
     const res = await fetch("/api/crm/users", { cache: "no-store" });
@@ -257,6 +259,44 @@ export default function CrmPage() {
     [leads, selectedLeadId]
   );
 
+  function handleDragStart(id: number) {
+    setDraggingId(id);
+  }
+
+  function handleDragEnd() {
+    setDraggingId(null);
+    setDragOverStatus(null);
+  }
+
+  async function handleDrop(status: CrmStatus) {
+    if (!draggingId) return;
+    const lead = leads.find((l) => l.id === draggingId);
+    setDragOverStatus(null);
+    if (!lead) {
+      setDraggingId(null);
+      return;
+    }
+    if (lead.crmStatus === status) {
+      setDraggingId(null);
+      return;
+    }
+    await updateStatus(draggingId, status);
+    setDraggingId(null);
+  }
+
+  function handleDragOver(status: CrmStatus) {
+    return (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      if (dragOverStatus !== status) setDragOverStatus(status);
+    };
+  }
+
+  function handleDragLeave(status: CrmStatus) {
+    return () => {
+      setDragOverStatus((prev) => (prev === status ? null : prev));
+    };
+  }
+
   return (
     <div className="min-h-screen bg-[var(--background)] text-slate-900">
       <div className="mx-auto max-w-[1440px] px-4 py-6 md:px-6">
@@ -364,15 +404,22 @@ export default function CrmPage() {
 
           <div className="mt-5">
             {viewMode === "kanban" ? (
-              <KanbanBoard
-                grouped={leadByStatus}
-                users={users}
-                onStatusChange={updateStatus}
-                onAssigneeChange={updateAssignee}
-                onScheduleChange={updateSchedule}
-                onSelectLead={setSelectedLeadId}
-                selectedLeadId={selectedLeadId}
-              />
+          <KanbanBoard
+            grouped={leadByStatus}
+            users={users}
+            onStatusChange={updateStatus}
+            onAssigneeChange={updateAssignee}
+            onScheduleChange={updateSchedule}
+            onSelectLead={setSelectedLeadId}
+            selectedLeadId={selectedLeadId}
+            draggingId={draggingId}
+            dragOverStatus={dragOverStatus}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDropStatus={handleDrop}
+            onDragOverStatus={handleDragOver}
+            onDragLeaveStatus={handleDragLeave}
+          />
             ) : (
               <LeadTable
                 leads={leads}
@@ -420,9 +467,16 @@ type KanbanBoardProps = {
   onScheduleChange: (id: number, field: "followUpAt" | "appointmentAt", value: string) => void;
   onSelectLead: (id: number | null) => void;
   selectedLeadId: number | null;
+  draggingId: number | null;
+  dragOverStatus: CrmStatus | null;
+  onDragStart: (id: number) => void;
+  onDragEnd: () => void;
+  onDropStatus: (status: CrmStatus) => Promise<void>;
+  onDragOverStatus: (status: CrmStatus) => (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragLeaveStatus: (status: CrmStatus) => () => void;
 };
 
-function KanbanBoard({ grouped, users, onStatusChange, onAssigneeChange, onScheduleChange, onSelectLead, selectedLeadId }: KanbanBoardProps) {
+function KanbanBoard({ grouped, users, onStatusChange, onAssigneeChange, onScheduleChange, onSelectLead, selectedLeadId, draggingId, dragOverStatus, onDragStart, onDragEnd, onDropStatus, onDragOverStatus, onDragLeaveStatus }: KanbanBoardProps) {
   return (
     <div className="flex gap-3 overflow-x-auto pb-2">
       {statusOptions.map((status) => (
@@ -436,6 +490,13 @@ function KanbanBoard({ grouped, users, onStatusChange, onAssigneeChange, onSched
           onScheduleChange={onScheduleChange}
           onSelectLead={onSelectLead}
           selectedLeadId={selectedLeadId}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+          onDropStatus={onDropStatus}
+          dragOverStatus={dragOverStatus}
+          onDragOverStatus={onDragOverStatus}
+          onDragLeaveStatus={onDragLeaveStatus}
+          draggingId={draggingId}
         />
       ))}
     </div>
@@ -451,9 +512,16 @@ type KanbanColumnProps = {
   onScheduleChange: (id: number, field: "followUpAt" | "appointmentAt", value: string) => void;
   onSelectLead: (id: number | null) => void;
   selectedLeadId: number | null;
+  onDragStart: (id: number) => void;
+  onDragEnd: () => void;
+  onDropStatus: (status: CrmStatus) => Promise<void>;
+  dragOverStatus: CrmStatus | null;
+  onDragOverStatus: (status: CrmStatus) => (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragLeaveStatus: (status: CrmStatus) => () => void;
+  draggingId: number | null;
 };
 
-function KanbanColumn({ status, leads, users, onStatusChange, onAssigneeChange, onScheduleChange, onSelectLead, selectedLeadId }: KanbanColumnProps) {
+function KanbanColumn({ status, leads, users, onStatusChange, onAssigneeChange, onScheduleChange, onSelectLead, selectedLeadId, onDragStart, onDragEnd, onDropStatus, dragOverStatus, onDragOverStatus, onDragLeaveStatus, draggingId }: KanbanColumnProps) {
   const headerColors: Record<CrmStatus, string> = {
     신규인입: "bg-red-500",
     "1차부재": "bg-amber-400",
@@ -466,7 +534,17 @@ function KanbanColumn({ status, leads, users, onStatusChange, onAssigneeChange, 
   };
 
   return (
-    <div className="w-80 flex-shrink-0 rounded-2xl border border-[var(--border)] bg-slate-50/70 p-3 shadow-sm">
+    <div
+      className={`w-80 flex-shrink-0 rounded-2xl border border-[var(--border)] p-3 shadow-sm transition-colors ${
+        dragOverStatus === status ? "bg-blue-50/60 border-[var(--primary)]/40" : "bg-slate-50/70"
+      }`}
+      onDragOver={onDragOverStatus(status)}
+      onDragLeave={onDragLeaveStatus(status)}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDropStatus(status);
+      }}
+    >
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className={`h-2 w-2 rounded-full ${headerColors[status]}`} />
@@ -488,12 +566,15 @@ function KanbanColumn({ status, leads, users, onStatusChange, onAssigneeChange, 
             lead={lead}
             users={users}
             onStatusChange={onStatusChange}
-            onAssigneeChange={onAssigneeChange}
-            onScheduleChange={onScheduleChange}
-            onSelect={() => onSelectLead(lead.id)}
-            selected={selectedLeadId === lead.id}
-          />
-        ))}
+          onAssigneeChange={onAssigneeChange}
+          onScheduleChange={onScheduleChange}
+          onSelect={() => onSelectLead(lead.id)}
+          selected={selectedLeadId === lead.id}
+          onDragStart={() => onDragStart(lead.id)}
+          onDragEnd={onDragEnd}
+          dragging={lead.id === draggingId}
+        />
+      ))}
       </div>
     </div>
   );
@@ -507,21 +588,33 @@ type LeadCardProps = {
   onScheduleChange: (id: number, field: "followUpAt" | "appointmentAt", value: string) => void;
   onSelect: () => void;
   selected: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  dragging?: boolean;
 };
 
-function LeadCard({ lead, users, onStatusChange, onAssigneeChange, onScheduleChange, onSelect, selected }: LeadCardProps) {
+function LeadCard({ lead, users, onStatusChange, onAssigneeChange, onScheduleChange, onSelect, selected, onDragStart, onDragEnd, dragging }: LeadCardProps) {
   const style = statusStyles[lead.crmStatus];
   return (
     <div
+      draggable
       role="button"
       tabIndex={0}
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter") onSelect();
       }}
-      className={`group cursor-pointer rounded-xl p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${style.tone} ${style.border} ${
+      onDragStart={(e) => {
+        e.stopPropagation();
+        onDragStart();
+      }}
+      onDragEnd={(e) => {
+        e.stopPropagation();
+        onDragEnd();
+      }}
+      className={`group cursor-grab rounded-xl p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${style.tone} ${style.border} ${
         selected ? "ring-2 ring-[var(--primary)]/40" : ""
-      }`}
+      } ${dragging ? "opacity-75 shadow-lg scale-[1.01]" : ""}`}
     >
       <div className="mb-2 flex items-start justify-between">
         <div className="flex items-center gap-2">
@@ -723,11 +816,24 @@ type LeadDrawerProps = {
 };
 
 function LeadDrawer({ lead, onClose, users, onStatusChange, onAssigneeChange, onScheduleChange }: LeadDrawerProps) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
   if (!lead) return null;
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/20 backdrop-blur-sm">
-      <div className="h-full w-full max-w-[420px] translate-x-0 transform bg-white shadow-2xl">
+    <div className="fixed inset-0 z-40 flex justify-end bg-black/20 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="h-full w-full max-w-[420px] translate-x-0 transform bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-start justify-between border-b border-[var(--border)] p-5">
           <div className="space-y-1">
             <div className="text-xs font-semibold text-slate-500">리드 상세</div>
