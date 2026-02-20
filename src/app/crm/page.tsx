@@ -49,6 +49,25 @@ interface CalendarEvent {
   at: string;
 }
 
+// Props Interfaces
+interface ViewProps {
+  leads: Lead[];
+  users: User[];
+  onSelect: (id: number) => void;
+  selectedId: number | null;
+  onStatus: (id: number, s: CrmStatus) => Promise<void>;
+  onAssignee: (id: number, userId: number | null) => Promise<void>;
+  onSchedule: (id: number, field: string, val: string) => Promise<void>;
+  loading?: boolean;
+}
+
+interface KanbanProps extends ViewProps {
+  draggingId: number | null;
+  setDraggingId: (id: number | null) => void;
+  dragOverStatus: CrmStatus | null;
+  setDragOverStatus: (s: CrmStatus | null) => void;
+}
+
 function toIsoLocal(datetime: string | null) {
   if (!datetime) return "";
   const d = new Date(datetime);
@@ -72,10 +91,10 @@ const statusStyles: Record<CrmStatus, { tone: string; badge: string; border: str
 
 export default function CrmPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
-  const [scope, setScope] = useState<Scope>("all"); // 전체보기가 기본
+  const [scope, setScope] = useState<Scope>("all");
   const [includeDone, setIncludeDone] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null); // null이면 전체 상담원
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
@@ -94,10 +113,14 @@ export default function CrmPage() {
   }, []);
 
   const fetchLeads = useCallback(async () => {
-    const qs = new URLSearchParams({ scope, includeDone: String(includeDone), limit: "150" });
+    const qs = new URLSearchParams({ 
+      scope, 
+      includeDone: String(includeDone), 
+      limit: "100" 
+    });
     if (selectedUserId) {
       qs.set("assigneeId", String(selectedUserId));
-      qs.set("scope", "mine"); // 특정 상담원 선택 시 자동으로 scope를 mine으로 조정하여 백엔드 필터링 유도
+      if (scope !== "mine") setScope("mine");
     }
     
     const res = await fetch(`/api/crm/leads?${qs.toString()}`);
@@ -107,10 +130,8 @@ export default function CrmPage() {
   }, [scope, includeDone, selectedUserId]);
 
   const fetchCalendar = useCallback(async () => {
-    // 캘린더는 전체보기 시에도 현재 선택된 상담원 혹은 전체 일정을 가져올 수 있도록 구성
     const qs = new URLSearchParams();
     if (selectedUserId) qs.set("assigneeId", String(selectedUserId));
-    
     const res = await fetch(`/api/crm/calendar?${qs.toString()}`);
     const json = await res.json();
     if (res.ok) setCalendarEvents((json.data || []) as CalendarEvent[]);
@@ -191,19 +212,26 @@ export default function CrmPage() {
         <header className="h-16 flex items-center justify-between px-6 bg-card border-b border-border shrink-0">
           <div className="flex items-center gap-6">
             <h1 className="text-xl font-bold">접수 현황</h1>
-            <div className="flex bg-slate-100 p-1 rounded-lg">
+            <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
               <button onClick={() => setViewMode("kanban")} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "kanban" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}><span className="material-icons text-sm">view_kanban</span> 칸반</button>
               <button onClick={() => setViewMode("list")} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}><span className="material-icons text-sm">view_list</span> 리스트</button>
               <button onClick={() => setViewMode("calendar")} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "calendar" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}><span className="material-icons text-sm">calendar_today</span> 캘린더</button>
             </div>
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+            
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg shrink-0 ml-2">
               <button onClick={() => { setScope("all"); setSelectedUserId(null); }} className={`px-3 py-1.5 text-[11px] font-bold rounded transition-all ${scope === "all" ? "bg-primary text-white" : "text-slate-500"}`}>전체보기</button>
-              <button onClick={() => { setScope("mine"); if (users.length > 0) setSelectedUserId(users[0].id); }} className={`px-3 py-1.5 text-[11px] font-bold rounded transition-all ${scope === "mine" ? "bg-primary text-white" : "text-slate-500"}`}>내 할당</button>
+              <button onClick={() => { setScope("mine"); if (users.length > 0 && !selectedUserId) setSelectedUserId(users[0].id); }} className={`px-3 py-1.5 text-[11px] font-bold rounded transition-all ${scope === "mine" ? "bg-primary text-white" : "text-slate-500"}`}>내 할당</button>
             </div>
+
+            <label className="flex items-center gap-2 cursor-pointer ml-4">
+              <input type="checkbox" checked={includeDone} onChange={e => setIncludeDone(e.target.checked)} className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4" />
+              <span className="text-[11px] font-bold text-slate-500">완료 항목 포함</span>
+            </label>
           </div>
+
           <div className="flex items-center gap-4">
-            <div className="relative"><span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">search</span><input type="text" placeholder="환자명, 전화번호 검색..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-64 bg-slate-100 border-none rounded-lg py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary/20" /></div>
-            <select value={selectedUserId || ""} onChange={(e) => { const val = e.target.value ? Number(e.target.value) : null; setSelectedUserId(val); setScope(val ? "mine" : "all"); }} className="bg-card border border-border rounded-lg px-3 py-2 text-sm font-medium">
+            <div className="relative"><span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">search</span><input type="text" placeholder="환자명, 전화번호..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-64 bg-slate-100 border-none rounded-lg py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary/20" /></div>
+            <select value={selectedUserId || ""} onChange={(e) => { const v = e.target.value ? Number(e.target.value) : null; setSelectedUserId(v); if(v) setScope("mine"); }} className="bg-card border border-border rounded-lg px-3 py-2 text-sm font-medium">
               <option value="">전체 상담원</option>
               {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
@@ -213,7 +241,7 @@ export default function CrmPage() {
         {/* Content Area */}
         <div className="flex-1 overflow-hidden p-6 relative">
           {viewMode === "kanban" && <KanbanView grouped={groupedLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} draggingId={draggingId} setDraggingId={setDraggingId} dragOverStatus={dragOverStatus} setDragOverStatus={setDragOverStatus} />}
-          {viewMode === "list" && <ListView leads={filteredLeads} users={users} onSelect={setSelectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} loading={loading} />}
+          {viewMode === "list" && <ListView leads={filteredLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} loading={loading} />}
           {viewMode === "calendar" && <CalendarView events={calendarEvents} />}
         </div>
       </main>
@@ -225,7 +253,7 @@ export default function CrmPage() {
   );
 }
 
-function KanbanView({ grouped, users, onSelect, selectedId, onStatus, onAssignee, onSchedule, draggingId, setDraggingId, dragOverStatus, setDragOverStatus }: any) {
+function KanbanView({ grouped, users, onSelect, selectedId, onStatus, onAssignee, onSchedule, draggingId, setDraggingId, dragOverStatus, setDragOverStatus }: KanbanProps) {
   return (
     <div className="flex gap-4 h-full overflow-x-auto pb-4 items-start">
       {statusOptions.map(status => (
@@ -236,7 +264,7 @@ function KanbanView({ grouped, users, onSelect, selectedId, onStatus, onAssignee
             <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${statusStyles[status].dot}`}></span><span className="font-bold text-sm text-slate-700">{status}</span><span className="bg-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm">{grouped[status].length}</span></div>
           </div>
           <div className="flex-1 overflow-y-auto px-3 space-y-3 pb-4">
-            {grouped[status].map((l: Lead) => (
+            {grouped[status].map((l) => (
               <div key={l.id} draggable onDragStart={() => setDraggingId(l.id)} onDragEnd={() => setDraggingId(null)} onClick={() => onSelect(l.id)}
                 className={`p-4 rounded-xl shadow-sm border bg-white cursor-grab transition-all hover:shadow-md ${statusStyles[l.crmStatus].border} ${selectedId === l.id ? "ring-2 ring-primary" : ""} ${draggingId === l.id ? "opacity-40" : ""}`}
               >
@@ -251,8 +279,9 @@ function KanbanView({ grouped, users, onSelect, selectedId, onStatus, onAssignee
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50" onClick={e => e.stopPropagation()}>
                    <div className="flex items-center gap-1 text-[10px] text-slate-400">
                      <span className="material-icons text-[12px]">person</span>
-                     {users.find((u:any) => u.id === l.assigneeId)?.name || "미할당"}
+                     {users.find(u => u.id === l.assigneeId)?.name || "미할당"}
                    </div>
+                   <div className="text-[10px] text-slate-400">{l.lastCallAt ? new Date(l.lastCallAt).toLocaleDateString() : ""}</div>
                 </div>
               </div>
             ))}
@@ -263,24 +292,48 @@ function KanbanView({ grouped, users, onSelect, selectedId, onStatus, onAssignee
   );
 }
 
-function ListView({ leads, users, onSelect, onStatus, onAssignee, onSchedule, loading }: any) {
+function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, onSchedule, loading }: ViewProps) {
+  const stop = (e: React.MouseEvent | React.ChangeEvent) => e.stopPropagation();
   return (
     <div className="h-full flex flex-col bg-card border border-border rounded-xl shadow-sm overflow-hidden">
       <div className="flex-1 overflow-auto">
         <table className="w-full text-left text-sm border-collapse">
           <thead className="sticky top-0 bg-slate-50 border-b border-border z-10">
-            <tr><th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">환자 정보</th><th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">태그 및 뱃지</th><th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">상태</th><th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">담당 상담원</th><th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">최근 업데이트</th></tr>
+            <tr>
+              <th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">환자 정보</th>
+              <th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">태그 및 뱃지</th>
+              <th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">상태 (인라인)</th>
+              <th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">담당자 (인라인)</th>
+              <th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">일정</th>
+            </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {leads.map((l: Lead) => (
-              <tr key={l.id} onClick={() => onSelect(l.id)} className="hover:bg-slate-50 cursor-pointer transition-colors">
+            {leads.map((l) => (
+              <tr key={l.id} onClick={() => onSelect(l.id)} className={`hover:bg-slate-50 cursor-pointer transition-colors ${selectedId === l.id ? "bg-blue-50/50" : ""}`}>
                 <td className="px-6 py-3"><div><div className="font-bold text-slate-900">{l.name}</div><div className="text-[10px] text-slate-500">{l.phone}</div></div></td>
                 <td className="px-6 py-3"><div className="flex gap-1">{l.isSenior65Plus && <span className="bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded text-[10px] font-bold">만 65세+</span>}<span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-bold">{l.careTag}</span></div></td>
-                <td className="px-6 py-3" onClick={e => e.stopPropagation()}><span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${statusStyles[l.crmStatus].badge}`}>{l.crmStatus}</span></td>
-                <td className="px-6 py-3" onClick={e => e.stopPropagation()}><div className="text-xs font-medium text-slate-600">{users.find((u:any) => u.id === l.assigneeId)?.name || "미할당"}</div></td>
-                <td className="px-6 py-3 text-slate-400 text-[11px]">{l.lastCallAt ? new Date(l.lastCallAt).toLocaleDateString() : new Date(l.createdAt).toLocaleDateString()}</td>
+                <td className="px-6 py-3" onClick={stop}>
+                  <select value={l.crmStatus} onChange={e => onStatus(l.id, e.target.value as CrmStatus)} className="text-[11px] font-bold border-slate-200 rounded px-2 py-1 bg-white focus:ring-1 focus:ring-primary">
+                    {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </td>
+                <td className="px-6 py-3" onClick={stop}>
+                  <select value={l.assigneeId || ""} onChange={e => onAssignee(l.id, e.target.value ? Number(e.target.value) : null)} className="text-[11px] border-slate-200 rounded px-2 py-1 bg-white">
+                    <option value="">미할당</option>
+                    {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select>
+                </td>
+                <td className="px-6 py-3" onClick={stop}>
+                  <div className="flex gap-1 items-center">
+                    <input type="datetime-local" defaultValue={toIsoLocal(l.followUpAt)} onBlur={e => onSchedule(l.id, "followUpAt", e.target.value)} className="text-[10px] border-slate-200 rounded px-1.5 py-0.5" />
+                    <span className="material-icons text-[14px] text-slate-300">calendar_today</span>
+                  </div>
+                </td>
               </tr>
             ))}
+            {leads.length === 0 && !loading && (
+              <tr><td colSpan={5} className="py-20 text-center text-slate-400">조회된 데이터가 없습니다.</td></tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -320,7 +373,7 @@ function LeadDrawer({ lead, onClose, users, onStatus, onAssignee, onSchedule }: 
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><span className="material-icons">close</span></button>
         </div>
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
-          <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-3">상태 업데이트</h4><div className="grid grid-cols-2 gap-2">{statusOptions.map(s => <button key={s} onClick={() => onStatus(lead.id, s)} className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all ${lead.crmStatus === s ? 'bg-primary/5 border-primary text-primary shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{s}</button>)}</div></section>
+          <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-3">상태 변경</h4><div className="grid grid-cols-2 gap-2">{statusOptions.map(s => <button key={s} onClick={() => onStatus(lead.id, s)} className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all ${lead.crmStatus === s ? 'bg-primary/5 border-primary text-primary shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{s}</button>)}</div></section>
           <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">담당 상담원</h4><select value={lead.assigneeId || ""} onChange={e => onAssignee(lead.id, Number(e.target.value) || null)} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm">{users.map((u:any) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></section>
           <section className="grid grid-cols-2 gap-4"><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">팔로업 일정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.followUpAt)} onBlur={e => onSchedule(lead.id, "followUpAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">예약 확정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onBlur={e => onSchedule(lead.id, "appointmentAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div></section>
         </div>
