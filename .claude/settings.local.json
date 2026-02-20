@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(npm install:*)",
+      "Bash(git init:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx next lint)",
+      "Bash(npx next build)",
+      "Bash(curl:*)",
+      "Bash(API_KEY=\"eb0c520cf5412fb14a249b63e94be53ed2b90baeddb76dc1ed6b3c6eb3167f6a\")"
+    ]
+  }
+}

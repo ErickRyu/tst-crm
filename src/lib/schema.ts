@@ -1,0 +1,47 @@
+import {
+  pgTable,
+  serial,
+  text,
+  integer,
+  timestamp,
+  date,
+} from "drizzle-orm/pg-core";
+
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  isActive: integer("is_active").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const leads = pgTable("leads", {
+  id: serial("id").primaryKey(),
+  event: text("event").notNull(),
+  site: text("site").notNull(),
+  advertiser: text("advertiser").notNull(),
+  media: text("media").notNull(),
+  category: text("category").notNull(),
+  name: text("name").notNull(),
+  phone: text("phone").notNull(),
+  age: integer("age"),
+  gender: text("gender"),
+  branch: text("branch"),
+  address: text("address"),
+  email: text("email"),
+  survey1: text("survey1"),
+  survey2: text("survey2"),
+  survey3: text("survey3"),
+  survey4: text("survey4"),
+  survey5: text("survey5"),
+  survey6: text("survey6"),
+  status: text("status").default("대기").notNull(),
+  memo: text("memo"),
+  ip: text("ip"),
+  crmStatus: text("crm_status").default("신규인입").notNull(),
+  assigneeId: integer("assignee_id").references(() => users.id),
+  birthDate: date("birth_date"),
+  lastCallAt: timestamp("last_call_at"),
+  followUpAt: timestamp("follow_up_at"),
+  appointmentAt: timestamp("appointment_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
