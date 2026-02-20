@@ -58,7 +58,8 @@ export function calculateSeniorBadge(birthDate: Date | string | null) {
   return { isSenior65Plus, monthsUntil65 };
 }
 
-export function canTransition(): boolean {
-  // 모든 상태 간 전이를 허용
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function canTransition(_from: CrmStatus, _to: CrmStatus): boolean {
+  // 모든 상태 간 전이를 허용 (향후 정책 복원 시 이 함수에서 차단)
   return true;
 }
