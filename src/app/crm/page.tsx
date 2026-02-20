@@ -1,9 +1,9 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
-import { useCallback, useEffect, useMemo, useState, Dispatch, SetStateAction, SyntheticEvent } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type ViewMode = "kanban" | "list" | "calendar";
+type Scope = "all" | "mine";
 
 const statusOptions = [
   "신규인입",
@@ -18,12 +18,12 @@ const statusOptions = [
 
 type CrmStatus = (typeof statusOptions)[number];
 
-type User = {
+interface User {
   id: number;
   name: string;
-};
+}
 
-type Lead = {
+interface Lead {
   id: number;
   name: string;
   phone: string;
@@ -38,16 +38,16 @@ type Lead = {
   monthsUntil65: number | null;
   careTag: string;
   priorityRank: number;
-};
+}
 
-type CalendarEvent = {
+interface CalendarEvent {
   id: string;
   leadId: number;
   patientName: string;
   phone: string;
   type: "follow_up" | "appointment";
   at: string;
-};
+}
 
 function toIsoLocal(datetime: string | null) {
   if (!datetime) return "";
@@ -59,63 +59,26 @@ function toIsoLocal(datetime: string | null) {
   )}:${pad(d.getMinutes())}`;
 }
 
-const statusStyles: Record<CrmStatus, { tone: string; badge: string; border: string; header: string }> = {
-  신규인입: {
-    tone: "bg-white",
-    badge: "bg-red-50 text-red-600",
-    border: "border-l-4 border-l-red-500",
-    header: "bg-red-500",
-  },
-  "1차부재": {
-    tone: "bg-white",
-    badge: "bg-amber-50 text-amber-700",
-    border: "border border-slate-100",
-    header: "bg-amber-400",
-  },
-  "2차부재": {
-    tone: "bg-white",
-    badge: "bg-amber-100 text-amber-800",
-    border: "border border-slate-100",
-    header: "bg-amber-500",
-  },
-  "3차부재": {
-    tone: "bg-white",
-    badge: "bg-amber-200 text-amber-900",
-    border: "border border-slate-100",
-    header: "bg-amber-600",
-  },
-  노쇼: {
-    tone: "bg-slate-50",
-    badge: "bg-slate-200 text-slate-800",
-    border: "border border-slate-200",
-    header: "bg-slate-400",
-  },
-  응대중: {
-    tone: "bg-white",
-    badge: "bg-blue-50 text-blue-700",
-    border: "border-2 border-primary ring-2 ring-primary/10",
-    header: "bg-primary",
-  },
-  통화완료: {
-    tone: "bg-slate-50",
-    badge: "bg-emerald-50 text-emerald-700",
-    border: "border border-emerald-100",
-    header: "bg-emerald-500",
-  },
-  예약완료: {
-    tone: "bg-slate-50",
-    badge: "bg-emerald-100 text-emerald-800",
-    border: "border border-emerald-200",
-    header: "bg-emerald-600",
-  },
+const statusStyles: Record<CrmStatus, { tone: string; badge: string; border: string; dot: string }> = {
+  신규인입: { tone: "bg-white", badge: "bg-red-50 text-red-600", border: "border-l-4 border-l-red-500", dot: "bg-red-500" },
+  "1차부재": { tone: "bg-white", badge: "bg-amber-50 text-amber-700", border: "border border-slate-200", dot: "bg-amber-400" },
+  "2차부재": { tone: "bg-white", badge: "bg-amber-100 text-amber-800", border: "border border-slate-200", dot: "bg-amber-500" },
+  "3차부재": { tone: "bg-white", badge: "bg-amber-200 text-amber-900", border: "border border-slate-200", dot: "bg-amber-600" },
+  노쇼: { tone: "bg-slate-50", badge: "bg-slate-200 text-slate-800", border: "border border-slate-300", dot: "bg-slate-400" },
+  응대중: { tone: "bg-white", badge: "bg-blue-50 text-blue-700", border: "border-2 border-primary ring-2 ring-primary/10", dot: "bg-primary" },
+  통화완료: { tone: "bg-slate-50", badge: "bg-emerald-50 text-emerald-700", border: "border border-emerald-100", dot: "bg-emerald-500" },
+  예약완료: { tone: "bg-slate-50", badge: "bg-emerald-100 text-emerald-800", border: "border border-emerald-200", dot: "bg-emerald-600" },
 };
 
 export default function CrmPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
+  const [scope, setScope] = useState<Scope>("all"); // 전체보기가 기본
+  const [includeDone, setIncludeDone] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null); // null이면 전체 상담원
   const [leads, setLeads] = useState<Lead[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
   const [draggingId, setDraggingId] = useState<number | null>(null);
@@ -124,238 +87,174 @@ export default function CrmPage() {
 
   const fetchUsers = useCallback(async () => {
     try {
-      const res = await fetch("/api/crm/users", { cache: "no-store" });
+      const res = await fetch("/api/crm/users");
       const json = await res.json();
-      const data = (json.data || []) as User[];
-      setUsers(data);
-      if (data.length > 0 && !selectedUserId) {
-        setSelectedUserId(data[0].id);
-      }
-    } catch {
-      setError("상담원 목록 조회 실패");
-    }
-  }, [selectedUserId]);
+      setUsers((json.data || []) as User[]);
+    } catch { setError("상담원 목록 조회 실패"); }
+  }, []);
 
   const fetchLeads = useCallback(async () => {
-    const qs = new URLSearchParams({ limit: "100" });
-    if (selectedUserId) qs.set("assigneeId", String(selectedUserId));
-
-    const res = await fetch(`/api/crm/leads?${qs.toString()}`, { cache: "no-store" });
+    const qs = new URLSearchParams({ scope, includeDone: String(includeDone), limit: "150" });
+    if (selectedUserId) {
+      qs.set("assigneeId", String(selectedUserId));
+      qs.set("scope", "mine"); // 특정 상담원 선택 시 자동으로 scope를 mine으로 조정하여 백엔드 필터링 유도
+    }
+    
+    const res = await fetch(`/api/crm/leads?${qs.toString()}`);
     const json = await res.json();
     if (!res.ok) throw new Error(json.message || "리드 조회 실패");
     setLeads((json.data || []) as Lead[]);
-  }, [selectedUserId]);
+  }, [scope, includeDone, selectedUserId]);
 
   const fetchCalendar = useCallback(async () => {
-    if (!selectedUserId) return;
-    const qs = new URLSearchParams({ assigneeId: String(selectedUserId) });
-    const res = await fetch(`/api/crm/calendar?${qs.toString()}`, { cache: "no-store" });
+    // 캘린더는 전체보기 시에도 현재 선택된 상담원 혹은 전체 일정을 가져올 수 있도록 구성
+    const qs = new URLSearchParams();
+    if (selectedUserId) qs.set("assigneeId", String(selectedUserId));
+    
+    const res = await fetch(`/api/crm/calendar?${qs.toString()}`);
     const json = await res.json();
     if (res.ok) setCalendarEvents((json.data || []) as CalendarEvent[]);
   }, [selectedUserId]);
 
   const refreshAll = useCallback(async () => {
     try {
+      setLoading(true);
       setError(null);
       await Promise.all([fetchLeads(), fetchCalendar()]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "조회 중 오류 발생");
-    }
+    } catch (e) { setError(e instanceof Error ? e.message : "조회 중 오류"); }
+    finally { setLoading(false); }
   }, [fetchLeads, fetchCalendar]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
   useEffect(() => { refreshAll(); }, [refreshAll]);
 
-  async function updateStatus(leadId: number, crmStatus: CrmStatus) {
-    const previous = leads;
-    setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, crmStatus } : l)));
+  const updateStatus = async (id: number, status: CrmStatus) => {
     try {
-      const res = await fetch(`/api/crm/leads/${leadId}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ crmStatus }),
+      const res = await fetch(`/api/crm/leads/${id}/status`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ crmStatus: status }),
       });
-      if (!res.ok) throw new Error("상태 변경 실패");
-      await refreshAll();
-    } catch (e) {
-      setLeads(previous);
-      setError(e instanceof Error ? e.message : "상태 변경 실패");
-    }
-  }
+      if (res.ok) await refreshAll();
+      else setError("상태 변경 실패");
+    } catch { setError("서버 통신 오류"); }
+  };
 
-  async function updateAssignee(leadId: number, assigneeId: number | null) {
+  const updateAssignee = async (id: number, assigneeId: number | null) => {
     try {
-      const res = await fetch(`/api/crm/leads/${leadId}/assign`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assigneeId }),
+      const res = await fetch(`/api/crm/leads/${id}/assign`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assigneeId }),
       });
-      if (!res.ok) throw new Error("상담원 할당 실패");
-      await refreshAll();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "상담원 할당 실패");
-    }
-  }
+      if (res.ok) await refreshAll();
+    } catch { setError("할당 변경 실패"); }
+  };
 
-  async function updateSchedule(leadId: number, field: "followUpAt" | "appointmentAt", value: string) {
+  const updateSchedule = async (id: number, field: string, value: string) => {
     try {
-      const payload = { [field]: value ? new Date(value).toISOString() : null };
-      const res = await fetch(`/api/crm/leads/${leadId}/schedule`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      const res = await fetch(`/api/crm/leads/${id}/schedule`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [field]: value ? new Date(value).toISOString() : null }),
       });
-      if (!res.ok) throw new Error("일정 저장 실패");
-      await refreshAll();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "일정 저장 실패");
-    }
-  }
+      if (res.ok) await refreshAll();
+    } catch { setError("일정 변경 실패"); }
+  };
 
   const filteredLeads = useMemo(() => {
-    let list = leads;
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      list = list.filter((l) => l.name.toLowerCase().includes(term) || l.phone.includes(term));
-    }
-    return list;
+    if (!searchTerm) return leads;
+    const t = searchTerm.toLowerCase();
+    return leads.filter(l => l.name.toLowerCase().includes(t) || l.phone.includes(t));
   }, [leads, searchTerm]);
 
-  const leadByStatus = useMemo(() => {
-    const grouped: Record<CrmStatus, Lead[]> = {
-      신규인입: [], "1차부재": [], "2차부재": [], "3차부재": [],
-      노쇼: [], 응대중: [], 통화완료: [], 예약완료: [],
-    };
-    filteredLeads.forEach((l) => grouped[l.crmStatus].push(l));
-    return grouped;
+  const groupedLeads = useMemo(() => {
+    const g: Record<CrmStatus, Lead[]> = { "신규인입": [], "1차부재": [], "2차부재": [], "3차부재": [], "노쇼": [], "응대중": [], "통화완료": [], "예약완료": [] };
+    filteredLeads.forEach(l => g[l.crmStatus].push(l));
+    return g;
   }, [filteredLeads]);
 
-  const selectedLead = useMemo(() => leads.find((l) => l.id === selectedLeadId) || null, [leads, selectedLeadId]);
+  const selectedLead = useMemo(() => leads.find(l => l.id === selectedLeadId) || null, [leads, selectedLeadId]);
 
   return (
-    <div className="flex h-screen w-full bg-background font-[family-name:var(--font-sans)]">
+    <div className="flex h-screen w-full bg-background overflow-hidden text-slate-900 font-[family-name:var(--font-sans)]">
       {/* Sidebar */}
-      <aside className="z-20 flex w-16 flex-col items-center border-r border-border bg-card py-6 shadow-sm">
-        <div className="mb-8"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-xl font-bold text-white shadow-lg shadow-primary/30">D</div></div>
-        <nav className="flex flex-1 flex-col items-center gap-6 w-full">
-          <button className="rounded-xl bg-primary/10 p-3 text-primary"><span className="material-icons">dashboard</span></button>
-          <button className="rounded-xl p-3 text-slate-400 hover:bg-slate-50 hover:text-primary"><span className="material-icons">people</span></button>
-          <button className="rounded-xl p-3 text-slate-400 hover:bg-slate-50 hover:text-primary"><span className="material-icons">chat</span></button>
+      <aside className="w-16 flex flex-col items-center py-6 bg-card border-r border-border shrink-0">
+        <div className="mb-8 w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-primary/30">D</div>
+        <nav className="flex-1 flex flex-col gap-6 items-center w-full">
+          <button className="p-3 bg-primary/10 text-primary rounded-xl"><span className="material-icons">dashboard</span></button>
+          <button className="p-3 text-slate-400 hover:text-primary"><span className="material-icons">people</span></button>
+          <button className="p-3 text-slate-400 hover:text-primary"><span className="material-icons">chat</span></button>
         </nav>
         <div className="mt-auto flex flex-col gap-4">
-          <button className="p-3 text-slate-400 hover:text-primary"><span className="material-icons">settings</span></button>
-          <div className="h-10 w-10 overflow-hidden rounded-full border-2 border-white bg-slate-200"><img src="https://lh3.googleusercontent.com/a/default-user" alt="User" /></div>
+          <button className="p-3 text-slate-400"><span className="material-icons">settings</span></button>
+          <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white overflow-hidden"><img src="https://lh3.googleusercontent.com/a/default-user" alt="User" /></div>
         </div>
       </aside>
 
-      <main className="relative flex flex-1 flex-col h-full overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="z-10 flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-6">
+        <header className="h-16 flex items-center justify-between px-6 bg-card border-b border-border shrink-0">
           <div className="flex items-center gap-6">
-            <h1 className="text-xl font-bold text-slate-800">접수 현황</h1>
-            <div className="flex rounded-lg bg-slate-100 p-1">
-              <button onClick={() => setViewMode("kanban")} className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded transition-all ${viewMode === "kanban" ? "bg-card text-slate-800 shadow-sm" : "text-slate-500"}`}><span className="material-icons text-sm">view_kanban</span> 칸반</button>
-              <button onClick={() => setViewMode("list")} className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded transition-all ${viewMode === "list" ? "bg-card text-slate-800 shadow-sm" : "text-slate-500"}`}><span className="material-icons text-sm">view_list</span> 리스트</button>
-              <button onClick={() => setViewMode("calendar")} className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded transition-all ${viewMode === "calendar" ? "bg-card text-slate-800 shadow-sm" : "text-slate-500"}`}><span className="material-icons text-sm">calendar_today</span> 캘린더</button>
+            <h1 className="text-xl font-bold">접수 현황</h1>
+            <div className="flex bg-slate-100 p-1 rounded-lg">
+              <button onClick={() => setViewMode("kanban")} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "kanban" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}><span className="material-icons text-sm">view_kanban</span> 칸반</button>
+              <button onClick={() => setViewMode("list")} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}><span className="material-icons text-sm">view_list</span> 리스트</button>
+              <button onClick={() => setViewMode("calendar")} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "calendar" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}><span className="material-icons text-sm">calendar_today</span> 캘린더</button>
+            </div>
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+              <button onClick={() => { setScope("all"); setSelectedUserId(null); }} className={`px-3 py-1.5 text-[11px] font-bold rounded transition-all ${scope === "all" ? "bg-primary text-white" : "text-slate-500"}`}>전체보기</button>
+              <button onClick={() => { setScope("mine"); if (users.length > 0) setSelectedUserId(users[0].id); }} className={`px-3 py-1.5 text-[11px] font-bold rounded transition-all ${scope === "mine" ? "bg-primary text-white" : "text-slate-500"}`}>내 할당</button>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="relative"><span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">search</span><input type="text" placeholder="검색..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-64 rounded-lg border-none bg-slate-100 py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary/20" /></div>
-            <select value={selectedUserId ?? ""} onChange={(e) => setSelectedUserId(e.target.value ? Number(e.target.value) : null)} className="rounded-lg border border-border bg-card px-3 py-2 text-sm">
-              {users.map((u) => (<option key={u.id} value={u.id}>{u.name}</option>))}
+            <div className="relative"><span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">search</span><input type="text" placeholder="환자명, 전화번호 검색..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-64 bg-slate-100 border-none rounded-lg py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary/20" /></div>
+            <select value={selectedUserId || ""} onChange={(e) => { const val = e.target.value ? Number(e.target.value) : null; setSelectedUserId(val); setScope(val ? "mine" : "all"); }} className="bg-card border border-border rounded-lg px-3 py-2 text-sm font-medium">
+              <option value="">전체 상담원</option>
+              {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           </div>
         </header>
 
-        {/* View Selection Content */}
-        <div className="flex-1 overflow-hidden p-6">
-          <div className="h-full">
-            {viewMode === "kanban" ? (
-              <KanbanBoard 
-                grouped={leadByStatus} users={users} onStatusChange={updateStatus} onAssigneeChange={updateAssignee} onScheduleChange={updateSchedule} onSelectLead={setSelectedLeadId} selectedLeadId={selectedLeadId}
-                draggingId={draggingId} setDraggingId={setDraggingId} dragOverStatus={dragOverStatus} setDragOverStatus={setDragOverStatus}
-              />
-            ) : viewMode === "list" ? (
-              <LeadTable
-                leads={filteredLeads}
-                users={users}
-                onStatusChange={updateStatus}
-                onAssigneeChange={updateAssignee}
-                onScheduleChange={updateSchedule}
-                onSelectLead={setSelectedLeadId}
-              />
-            ) : (
-              <CalendarView events={calendarEvents} />
-            )}
-          </div>
+        {/* Content Area */}
+        <div className="flex-1 overflow-hidden p-6 relative">
+          {viewMode === "kanban" && <KanbanView grouped={groupedLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} draggingId={draggingId} setDraggingId={setDraggingId} dragOverStatus={dragOverStatus} setDragOverStatus={setDragOverStatus} />}
+          {viewMode === "list" && <ListView leads={filteredLeads} users={users} onSelect={setSelectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} loading={loading} />}
+          {viewMode === "calendar" && <CalendarView events={calendarEvents} />}
         </div>
-
-        {error && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-2 rounded-full shadow-lg z-50 flex items-center gap-2 animate-bounce">
-            <span className="material-icons">error</span> {error} <button onClick={() => setError(null)}>✕</button>
-          </div>
-        )}
       </main>
 
-      <LeadDrawer lead={selectedLead} onClose={() => setSelectedLeadId(null)} users={users} onStatusChange={updateStatus} onAssigneeChange={updateAssignee} onScheduleChange={updateSchedule} />
+      <LeadDrawer lead={selectedLead} onClose={() => setSelectedLeadId(null)} users={users} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} />
+      
+      {error && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-2 rounded-full shadow-2xl z-50 flex items-center gap-2"><span className="material-icons">warning</span> {error} <button onClick={() => setError(null)}>✕</button></div>}
     </div>
   );
 }
 
-type KanbanBoardProps = {
-  grouped: Record<CrmStatus, Lead[]>;
-  users: User[];
-  onStatusChange: (id: number, status: CrmStatus) => void;
-  onAssigneeChange: (id: number, assigneeId: number | null) => void;
-  onScheduleChange: (id: number, field: "followUpAt" | "appointmentAt", value: string) => void;
-  onSelectLead: (id: number) => void;
-  selectedLeadId: number | null;
-  draggingId: number | null;
-  setDraggingId: Dispatch<SetStateAction<number | null>>;
-  dragOverStatus: CrmStatus | null;
-  setDragOverStatus: Dispatch<SetStateAction<CrmStatus | null>>;
-};
-
-function KanbanBoard({
-  grouped,
-  users,
-  onStatusChange,
-  onAssigneeChange,
-  onScheduleChange,
-  onSelectLead,
-  selectedLeadId,
-  draggingId,
-  setDraggingId,
-  dragOverStatus,
-  setDragOverStatus,
-}: KanbanBoardProps) {
+function KanbanView({ grouped, users, onSelect, selectedId, onStatus, onAssignee, onSchedule, draggingId, setDraggingId, dragOverStatus, setDragOverStatus }: any) {
   return (
-    <div className="flex gap-4 overflow-x-auto h-full pb-4">
-      {statusOptions.map((status) => (
-        <div key={status} onDragOver={(e) => { e.preventDefault(); setDragOverStatus(status); }} onDragLeave={() => setDragOverStatus(null)} onDrop={async () => { if (!draggingId) return; setDragOverStatus(null); await onStatusChange(draggingId, status); setDraggingId(null); }}
-          className={`w-80 flex-shrink-0 flex flex-col rounded-xl border border-border bg-slate-100/50 transition-colors ${dragOverStatus === status ? "bg-primary/5 border-primary/40" : ""}`}
+    <div className="flex gap-4 h-full overflow-x-auto pb-4 items-start">
+      {statusOptions.map(status => (
+        <div key={status} onDragOver={(e) => { e.preventDefault(); setDragOverStatus(status); }} onDragLeave={() => setDragOverStatus(null)} onDrop={() => { if (!draggingId) return; setDragOverStatus(null); onStatus(draggingId, status); setDraggingId(null); }}
+          className={`w-80 shrink-0 flex flex-col max-h-full rounded-xl border border-border bg-slate-100/40 transition-colors ${dragOverStatus === status ? "bg-primary/5 border-primary/40" : ""}`}
         >
-          <div className="p-4 flex items-center justify-between sticky top-0 z-10">
-            <div className="flex items-center gap-2">
-              <span className={`h-2 w-2 rounded-full ${statusStyles[status].header}`}></span>
-              <h3 className="font-semibold text-slate-700 text-sm">{status}</h3>
-              <span className="bg-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm">{grouped[status].length}</span>
-            </div>
+          <div className="p-4 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${statusStyles[status].dot}`}></span><span className="font-bold text-sm text-slate-700">{status}</span><span className="bg-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm">{grouped[status].length}</span></div>
           </div>
           <div className="flex-1 overflow-y-auto px-3 space-y-3 pb-4">
-            {grouped[status].map((lead: Lead) => (
-              <LeadCard
-                key={lead.id}
-                lead={lead}
-                users={users}
-                onAssigneeChange={onAssigneeChange}
-                onScheduleChange={onScheduleChange}
-                onSelect={() => onSelectLead(lead.id)}
-                selected={selectedLeadId === lead.id}
-                onDragStart={() => setDraggingId(lead.id)}
-                onDragEnd={() => setDraggingId(null)}
-                dragging={draggingId === lead.id}
-              />
+            {grouped[status].map((l: Lead) => (
+              <div key={l.id} draggable onDragStart={() => setDraggingId(l.id)} onDragEnd={() => setDraggingId(null)} onClick={() => onSelect(l.id)}
+                className={`p-4 rounded-xl shadow-sm border bg-white cursor-grab transition-all hover:shadow-md ${statusStyles[l.crmStatus].border} ${selectedId === l.id ? "ring-2 ring-primary" : ""} ${draggingId === l.id ? "opacity-40" : ""}`}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div><div className="font-bold text-sm">{l.name}</div><div className="text-[10px] text-slate-500">{l.phone}</div></div>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${statusStyles[l.crmStatus].badge}`}>{l.crmStatus}</span>
+                </div>
+                <div className="flex flex-wrap gap-1 mb-3">
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${l.careTag.includes("임플란트") ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-600"}`}>{l.careTag}</span>
+                  {l.isSenior65Plus && <span className="bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded text-[10px] font-bold">만 65세+</span>}
+                </div>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50" onClick={e => e.stopPropagation()}>
+                   <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                     <span className="material-icons text-[12px]">person</span>
+                     {users.find((u:any) => u.id === l.assigneeId)?.name || "미할당"}
+                   </div>
+                </div>
+              </div>
             ))}
           </div>
         </div>
@@ -364,151 +263,68 @@ function KanbanBoard({
   );
 }
 
-type LeadCardProps = {
-  lead: Lead;
-  users: User[];
-  onAssigneeChange: (id: number, assigneeId: number | null) => void;
-  onScheduleChange: (id: number, field: "followUpAt" | "appointmentAt", value: string) => void;
-  onSelect: () => void;
-  selected: boolean;
-  onDragStart: () => void;
-  onDragEnd: () => void;
-  dragging: boolean;
-};
-
-function LeadCard({ lead, users, onAssigneeChange, onScheduleChange, onSelect, selected, onDragStart, onDragEnd, dragging }: LeadCardProps) {
-  const style = statusStyles[lead.crmStatus];
-  const stop = (e: SyntheticEvent) => e.stopPropagation();
+function ListView({ leads, users, onSelect, onStatus, onAssignee, onSchedule, loading }: any) {
   return (
-    <div draggable onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onSelect}
-      className={`group cursor-grab rounded-xl p-4 shadow-sm border transition-all hover:shadow-md ${style.tone} ${style.border} ${selected ? "ring-2 ring-primary/40" : ""} ${dragging ? "opacity-50" : ""}`}
-    >
-      <div className="flex justify-between items-start mb-2">
-        <div>
-          <div className="font-bold text-slate-800 text-sm">{lead.name}</div>
-          <div className="text-[10px] text-slate-500">{lead.phone}</div>
-        </div>
-        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${style.badge}`}>{lead.crmStatus}</span>
+    <div className="h-full flex flex-col bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-left text-sm border-collapse">
+          <thead className="sticky top-0 bg-slate-50 border-b border-border z-10">
+            <tr><th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">환자 정보</th><th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">태그 및 뱃지</th><th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">상태</th><th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">담당 상담원</th><th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">최근 업데이트</th></tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {leads.map((l: Lead) => (
+              <tr key={l.id} onClick={() => onSelect(l.id)} className="hover:bg-slate-50 cursor-pointer transition-colors">
+                <td className="px-6 py-3"><div><div className="font-bold text-slate-900">{l.name}</div><div className="text-[10px] text-slate-500">{l.phone}</div></div></td>
+                <td className="px-6 py-3"><div className="flex gap-1">{l.isSenior65Plus && <span className="bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded text-[10px] font-bold">만 65세+</span>}<span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-bold">{l.careTag}</span></div></td>
+                <td className="px-6 py-3" onClick={e => e.stopPropagation()}><span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${statusStyles[l.crmStatus].badge}`}>{l.crmStatus}</span></td>
+                <td className="px-6 py-3" onClick={e => e.stopPropagation()}><div className="text-xs font-medium text-slate-600">{users.find((u:any) => u.id === l.assigneeId)?.name || "미할당"}</div></td>
+                <td className="px-6 py-3 text-slate-400 text-[11px]">{l.lastCallAt ? new Date(l.lastCallAt).toLocaleDateString() : new Date(l.createdAt).toLocaleDateString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-      <div className="flex flex-wrap gap-1 mb-3">
-        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${lead.careTag.includes("임플란트") ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-600"}`}>{lead.careTag}</span>
-        {lead.isSenior65Plus ? <span className="bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded text-[10px] font-bold">만 65세+</span> : lead.monthsUntil65 !== null && lead.monthsUntil65 <= 12 ? <span className="bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded text-[10px] font-bold">65세 도달 {lead.monthsUntil65}개월 전</span> : null}
-      </div>
-      <div className="space-y-2 text-[11px]">
-        <select value={lead.assigneeId ?? ""} onClick={stop} onChange={(e) => onAssigneeChange(lead.id, e.target.value ? Number(e.target.value) : null)} className="w-full bg-white border border-border rounded px-2 py-1">
-          <option value="">미할당</option>
-          {users.map((u) => (<option key={u.id} value={u.id}>{u.name}</option>))}
-        </select>
-        <div className="flex gap-1">
-          <input type="datetime-local" defaultValue={toIsoLocal(lead.followUpAt)} onClick={stop} onBlur={(e) => onScheduleChange(lead.id, "followUpAt", e.target.value)} className="w-1/2 border border-border rounded px-1.5 py-1" />
-          <input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onClick={stop} onBlur={(e) => onScheduleChange(lead.id, "appointmentAt", e.target.value)} className="w-1/2 border border-border rounded px-1.5 py-1" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-type LeadTableProps = {
-  leads: Lead[];
-  users: User[];
-  onStatusChange: (id: number, status: CrmStatus) => void;
-  onAssigneeChange: (id: number, assigneeId: number | null) => void;
-  onScheduleChange: (id: number, field: "followUpAt" | "appointmentAt", value: string) => void;
-  onSelectLead: (id: number) => void;
-};
-
-function LeadTable({ leads, users, onStatusChange, onAssigneeChange, onScheduleChange, onSelectLead }: LeadTableProps) {
-  const stop = (e: SyntheticEvent) => e.stopPropagation();
-  return (
-    <div className="bg-white border border-border rounded-xl overflow-hidden shadow-sm">
-      <table className="w-full text-left text-sm">
-        <thead className="bg-slate-50 border-b border-border">
-          <tr><th className="px-4 py-3">환자</th><th className="px-4 py-3">태그</th><th className="px-4 py-3">상태</th><th className="px-4 py-3">할당</th><th className="px-4 py-3">일정</th></tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {leads.map((lead: Lead) => (
-            <tr key={lead.id} onClick={() => onSelectLead(lead.id)} className="hover:bg-slate-50 transition-colors cursor-pointer">
-              <td className="px-4 py-3"><div><div className="font-bold">{lead.name}</div><div className="text-[10px] text-slate-500">{lead.phone}</div></div></td>
-              <td className="px-4 py-3"><div className="flex gap-1">{lead.isSenior65Plus && <span className="bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded text-[10px] font-bold">만 65세+</span>} <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-bold">{lead.careTag}</span></div></td>
-              <td className="px-4 py-3"><select value={lead.crmStatus} onClick={stop} onChange={(e) => onStatusChange(lead.id, e.target.value as CrmStatus)} className="border border-border rounded px-2 py-1 text-xs">{statusOptions.map(s => <option key={s} value={s}>{s}</option>)}</select></td>
-              <td className="px-4 py-3"><select value={lead.assigneeId ?? ""} onClick={stop} onChange={(e) => onAssigneeChange(lead.id, e.target.value ? Number(e.target.value) : null)} className="border border-border rounded px-2 py-1 text-xs"><option value="">미할당</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></td>
-              <td className="px-4 py-3"><div className="flex gap-2"><input type="datetime-local" defaultValue={toIsoLocal(lead.followUpAt)} onClick={stop} onBlur={(e) => onScheduleChange(lead.id, "followUpAt", e.target.value)} className="border border-border rounded px-1.5 py-1 text-xs" /><input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onClick={stop} onBlur={(e) => onScheduleChange(lead.id, "appointmentAt", e.target.value)} className="border border-border rounded px-1.5 py-1 text-xs" /></div></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
 
 function CalendarView({ events }: { events: CalendarEvent[] }) {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-  const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
-  const eventsByDay = useMemo(() => {
-    const grouped: Record<number, CalendarEvent[]> = {};
-    events.forEach(ev => { const d = new Date(ev.at); if (d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear()) { const day = d.getDate(); if (!grouped[day]) grouped[day] = []; grouped[day].push(ev); } });
-    return grouped;
-  }, [events, currentDate]);
+  const [cur, setCur] = useState(new Date());
+  const days = new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate();
+  const start = new Date(cur.getFullYear(), cur.getMonth(), 1).getDay();
+  const grouped = useMemo(() => {
+    const r: Record<number, CalendarEvent[]> = {};
+    events.forEach(e => { const d = new Date(e.at); if(d.getMonth() === cur.getMonth() && d.getFullYear() === cur.getFullYear()) { const dd = d.getDate(); r[dd] = [...(r[dd] || []), e]; } });
+    return r;
+  }, [events, cur]);
   return (
-    <div className="bg-white border border-border rounded-xl h-full flex flex-col overflow-hidden shadow-sm">
-      <div className="p-4 border-b border-border flex justify-between items-center bg-slate-50">
-        <h3 className="font-bold text-slate-800">{currentDate.getFullYear()}년 {currentDate.getMonth()+1}월</h3>
-        <div className="flex gap-1"><button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth()-1))} className="p-1 border border-border rounded hover:bg-white"><span className="material-icons">chevron_left</span></button><button onClick={() => setCurrentDate(new Date())} className="px-3 border border-border rounded hover:bg-white text-xs">오늘</button><button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth()+1))} className="p-1 border border-border rounded hover:bg-white"><span className="material-icons">chevron_right</span></button></div>
-      </div>
-      <div className="flex-1 overflow-auto p-4"><div className="grid grid-cols-7 gap-px bg-slate-200 border border-slate-200">
+    <div className="h-full flex flex-col bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+      <div className="p-4 bg-slate-50 border-b border-border flex justify-between items-center"><h3 className="font-bold">{cur.getFullYear()}년 {cur.getMonth()+1}월 일정</h3><div className="flex gap-1"><button onClick={() => setCur(new Date(cur.getFullYear(), cur.getMonth()-1))} className="p-1 border border-border rounded hover:bg-white"><span className="material-icons">chevron_left</span></button><button onClick={() => setCur(new Date())} className="px-3 py-1 border border-border rounded hover:bg-white text-xs">오늘</button><button onClick={() => setCur(new Date(cur.getFullYear(), cur.getMonth()+1))} className="p-1 border border-border rounded hover:bg-white"><span className="material-icons">chevron_right</span></button></div></div>
+      <div className="flex-1 overflow-auto p-4"><div className="grid grid-cols-7 bg-slate-200 border border-slate-200 gap-px">
         {["일","월","화","수","목","금","토"].map(d => <div key={d} className="bg-slate-50 py-2 text-center text-[10px] font-bold text-slate-400">{d}</div>)}
-        {Array.from({length: firstDay}).map((_, i) => <div key={i} className="bg-slate-50/50 min-h-[120px]"></div>)}
-        {Array.from({length: daysInMonth}).map((_, i) => { const day = i+1; return <div key={day} className="bg-white min-h-[120px] p-2 space-y-1"><span className="text-[10px] font-bold text-slate-300">{day}</span>{eventsByDay[day]?.map(ev => <div key={ev.id} className={`text-[9px] p-1 rounded border ${ev.type === 'appointment' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-blue-50 text-blue-700 border-blue-100'}`}><div className="font-bold truncate">{ev.patientName}</div><div className="opacity-70">{new Date(ev.at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div></div>)}</div> })}
+        {Array.from({length: start}).map((_, i) => <div key={i} className="bg-slate-50/50 min-h-[100px]"></div>)}
+        {Array.from({length: days}).map((_, i) => { const d = i+1; return <div key={d} className="bg-white min-h-[100px] p-2 space-y-1"><div className="text-[10px] text-slate-400 font-bold">{d}</div>{grouped[d]?.map(e => <div key={e.id} className={`text-[9px] p-1 rounded border truncate ${e.type==='appointment'?'bg-emerald-50 border-emerald-100 text-emerald-700':'bg-blue-50 border-blue-100 text-blue-700'}`}>{e.patientName}</div>)}</div> })}
       </div></div>
     </div>
   );
 }
 
-type LeadDrawerProps = {
-  lead: Lead | null;
-  onClose: () => void;
-  users: User[];
-  onStatusChange: (id: number, status: CrmStatus) => void;
-  onAssigneeChange: (id: number, assigneeId: number | null) => void;
-  onScheduleChange: (id: number, field: "followUpAt" | "appointmentAt", value: string) => void;
-};
-
-function LeadDrawer({ lead, onClose, users, onStatusChange, onAssigneeChange, onScheduleChange }: LeadDrawerProps) {
+function LeadDrawer({ lead, onClose, users, onStatus, onAssignee, onSchedule }: any) {
   if (!lead) return null;
   return (
     <>
       <div className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm" onClick={onClose}></div>
-      <aside className="fixed top-0 right-0 z-40 h-full w-[420px] bg-white shadow-2xl flex flex-col">
-        <div className="p-6 border-b border-slate-100 flex justify-between items-start">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-primary font-bold text-xl">{lead.name.substring(0,1)}</div>
-            <div><h2 className="text-lg font-bold">{lead.name}</h2><div className="text-sm text-slate-500">{lead.phone}</div></div>
-          </div>
-          <button onClick={onClose} className="text-slate-400"><span className="material-icons">close</span></button>
+      <aside className="fixed top-0 right-0 z-40 h-full w-[420px] bg-white shadow-2xl flex flex-col translate-x-0 transition-transform">
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
+          <div className="flex items-center gap-4"><div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-primary font-bold text-xl">{lead.name[0]}</div><div><h2 className="font-bold text-lg">{lead.name}</h2><div className="text-sm text-slate-500">{lead.phone}</div></div></div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><span className="material-icons">close</span></button>
         </div>
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          <div className="space-y-4">
-            <div><h4 className="text-xs font-bold text-slate-400 uppercase mb-2">상태 변경</h4>
-              <div className="grid grid-cols-2 gap-2">{statusOptions.map(s => <button key={s} onClick={() => onStatusChange(lead.id, s)} className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all ${lead.crmStatus === s ? 'bg-primary/5 border-primary text-primary shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{s}</button>)}</div>
-            </div>
-            <div><h4 className="text-xs font-bold text-slate-400 uppercase mb-2">담당 상담원</h4>
-              <select value={lead.assigneeId ?? ""} onChange={(e) => onAssigneeChange(lead.id, e.target.value ? Number(e.target.value) : null)} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm">{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><h4 className="text-xs font-bold text-slate-400 uppercase mb-2">팔로업 예약</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.followUpAt)} onBlur={(e) => onScheduleChange(lead.id, "followUpAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div>
-              <div><h4 className="text-xs font-bold text-slate-400 uppercase mb-2">예약 확정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onBlur={(e) => onScheduleChange(lead.id, "appointmentAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div>
-            </div>
-          </div>
-          <div><h4 className="text-xs font-bold text-slate-400 uppercase mb-3">상담 히스토리</h4><div className="space-y-4 border-l-2 border-slate-100 pl-4">
-            <div className="relative"><div className="absolute -left-[21px] top-0 h-4 w-4 rounded-full border-2 border-white bg-primary shadow-sm"></div><div className="text-[10px] font-bold text-slate-400">{new Date(lead.createdAt).toLocaleString()}</div><div className="text-xs text-slate-700 bg-slate-50 p-3 rounded-lg mt-1 border border-slate-100">최초 유입: {lead.careTag}</div></div>
-            {lead.lastCallAt && <div className="relative"><div className="absolute -left-[21px] top-0 h-4 w-4 rounded-full border-2 border-white bg-amber-400 shadow-sm"></div><div className="text-[10px] font-bold text-slate-400">{new Date(lead.lastCallAt).toLocaleString()}</div><div className="text-xs text-slate-700 bg-slate-50 p-3 rounded-lg mt-1 border border-slate-100">최근 상담 기록: {lead.crmStatus}</div></div>}
-          </div></div>
+        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+          <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-3">상태 업데이트</h4><div className="grid grid-cols-2 gap-2">{statusOptions.map(s => <button key={s} onClick={() => onStatus(lead.id, s)} className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all ${lead.crmStatus === s ? 'bg-primary/5 border-primary text-primary shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{s}</button>)}</div></section>
+          <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">담당 상담원</h4><select value={lead.assigneeId || ""} onChange={e => onAssignee(lead.id, Number(e.target.value) || null)} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm">{users.map((u:any) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></section>
+          <section className="grid grid-cols-2 gap-4"><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">팔로업 일정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.followUpAt)} onBlur={e => onSchedule(lead.id, "followUpAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">예약 확정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onBlur={e => onSchedule(lead.id, "appointmentAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div></section>
         </div>
-        <div className="p-4 border-t border-slate-100 grid grid-cols-2 gap-3 bg-slate-50/50">
-          <button className="flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"><span className="material-icons text-sm">schedule</span> 부재중 안내</button>
-          <button className="flex items-center justify-center gap-2 py-2.5 bg-primary text-white rounded-lg text-sm font-medium shadow-sm shadow-primary/20 hover:bg-blue-700"><span className="material-icons text-sm">event</span> 예약 하기</button>
-        </div>
+        <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex gap-3 shrink-0"><button className="flex-1 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600">부재중 전송</button><button className="flex-1 py-2.5 bg-primary text-white rounded-lg text-sm font-medium shadow-lg shadow-primary/20">예약 하기</button></div>
       </aside>
     </>
   );
