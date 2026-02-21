@@ -82,6 +82,16 @@ function toIsoLocal(datetime: string | null) {
   )}:${pad(d.getMinutes())}`;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function isOverdue(lead: Lead) {
+  if (lead.crmStatus === "노쇼") return { flag: true, label: "노쇼" };
+  const created = new Date(lead.createdAt).getTime();
+  if (Number.isNaN(created)) return { flag: false, label: "" };
+  const over24 = Date.now() - created >= DAY_MS;
+  return { flag: over24, label: over24 ? "24h+" : "" };
+}
+
 const statusStyles: Record<CrmStatus, { tone: string; badge: string; border: string; dot: string }> = {
   신규인입: { tone: "bg-white", badge: "bg-red-50 text-red-600", border: "border-l-4 border-l-red-500", dot: "bg-red-500" },
   "1차부재": { tone: "bg-white", badge: "bg-amber-50 text-amber-700", border: "border border-slate-200", dot: "bg-amber-400" },
@@ -326,7 +336,10 @@ function KanbanView({ grouped, users, onSelect, selectedId, onStatus, onAssignee
               >
                 <div className="flex justify-between items-start mb-2">
                   <div><div className="font-bold text-sm">{l.name}</div><div className="text-[10px] text-slate-500">{l.phone}</div></div>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${statusStyles[l.crmStatus].badge}`}>{l.crmStatus}</span>
+                  <div className="flex gap-1">
+                    {(() => { const { flag, label } = isOverdue(l); return flag ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">{label}</span> : null; })()}
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${statusStyles[l.crmStatus].badge}`}>{l.crmStatus}</span>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-1 mb-3">
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${l.careTag.includes("임플란트") ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-600"}`}>{l.careTag}</span>
@@ -367,7 +380,7 @@ function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, on
           <tbody className="divide-y divide-slate-100">
             {leads.map((l) => (
               <tr key={l.id} onClick={() => onSelect(l.id)} className={`hover:bg-slate-50 cursor-pointer transition-colors ${selectedId === l.id ? "bg-blue-50/50" : ""}`}>
-                <td className="px-6 py-3"><div><div className="font-bold text-slate-900">{l.name}</div><div className="text-[10px] text-slate-500">{l.phone}</div></div></td>
+                <td className="px-6 py-3"><div className="flex items-center gap-2"><div><div className="font-bold text-slate-900">{l.name}</div><div className="text-[10px] text-slate-500">{l.phone}</div></div>{(() => { const { flag, label } = isOverdue(l); return flag ? <span className="bg-red-100 text-red-700 border border-red-200 px-1.5 py-0.5 rounded text-[10px] font-bold whitespace-nowrap">{label}</span> : null; })()}</div></td>
                 <td className="px-6 py-3"><div className="flex gap-1">{l.isSenior65Plus && <span className="bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded text-[10px] font-bold">만 65세+</span>}<span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-bold">{l.careTag}</span></div></td>
                 <td className="px-6 py-3" onClick={stop}>
                   <select value={l.crmStatus} onChange={e => onStatus(l.id, e.target.value as CrmStatus)} className="text-[11px] font-bold border-slate-200 rounded px-2 py-1 bg-white focus:ring-1 focus:ring-primary">
