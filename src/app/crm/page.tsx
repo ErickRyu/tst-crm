@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { FeedbackProvider, useToast, useLoading } from "./ui/feedback";
 
 type ViewMode = "kanban" | "list" | "calendar";
 type Scope = "all" | "mine";
@@ -107,8 +107,9 @@ export default function CrmPage() {
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<CrmStatus | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [toast, setToast] = useState<{ message: string; tone?: "error" | "success" | "info" } | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const { pushToast } = useToast();
+  const { start: startLoading, stop: stopLoading } = useLoading();
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -147,6 +148,7 @@ export default function CrmPage() {
   }, [selectedUserId]);
 
   const refreshAll = useCallback(async () => {
+    const loadingId = startLoading("데이터를 불러오는 중");
     try {
       setLoading(true);
       setError(null);
@@ -154,10 +156,13 @@ export default function CrmPage() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "조회 중 오류";
       setError(msg);
-      setToast({ message: msg, tone: "error" });
+      pushToast(msg, "error", refreshAll);
     }
-    finally { setLoading(false); }
-  }, [fetchLeads, fetchCalendar]);
+    finally {
+      setLoading(false);
+      stopLoading(loadingId);
+    }
+  }, [fetchLeads, fetchCalendar, pushToast, startLoading, stopLoading]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
   useEffect(() => { refreshAll(); }, [refreshAll]);
@@ -169,15 +174,15 @@ export default function CrmPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ crmStatus: status, version }),
       });
       if (res.ok) {
-        setToast({ message: "상태가 변경되었습니다.", tone: "success" });
+        pushToast("상태가 변경되었습니다.", "success");
         await refreshAll();
       } else if (res.status === 409) {
         setError("다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요.");
-        setToast({ message: "다른 상담원이 먼저 변경했습니다.", tone: "error" });
+        pushToast("다른 상담원이 먼저 변경했습니다.", "error");
       } else setError("상태 변경 실패");
     } catch {
       setError("서버 통신 오류");
-      setToast({ message: "서버 통신 오류", tone: "error" });
+      pushToast("서버 통신 오류", "error");
     }
   };
 
@@ -188,13 +193,13 @@ export default function CrmPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assigneeId, version }),
       });
       if (res.ok) {
-        setToast({ message: "담당자가 변경되었습니다.", tone: "success" });
+        pushToast("담당자가 변경되었습니다.", "success");
         await refreshAll();
       } else if (res.status === 409) {
         setError("다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요.");
-        setToast({ message: "다른 상담원이 먼저 변경했습니다.", tone: "error" });
+        pushToast("다른 상담원이 먼저 변경했습니다.", "error");
       }
-    } catch { setError("할당 변경 실패"); setToast({ message: "할당 변경 실패", tone: "error" }); }
+    } catch { setError("할당 변경 실패"); pushToast("할당 변경 실패", "error"); }
   };
 
   const updateSchedule = async (id: number, field: string, value: string) => {
@@ -204,13 +209,13 @@ export default function CrmPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [field]: value ? new Date(value).toISOString() : null, version }),
       });
       if (res.ok) {
-        setToast({ message: "일정이 변경되었습니다.", tone: "success" });
+        pushToast("일정이 변경되었습니다.", "success");
         await refreshAll();
       } else if (res.status === 409) {
         setError("다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요.");
-        setToast({ message: "다른 상담원이 먼저 변경했습니다.", tone: "error" });
+        pushToast("다른 상담원이 먼저 변경했습니다.", "error");
       }
-    } catch { setError("일정 변경 실패"); setToast({ message: "일정 변경 실패", tone: "error" }); }
+    } catch { setError("일정 변경 실패"); pushToast("일정 변경 실패", "error"); }
   };
 
   const filteredLeads = useMemo(() => {
@@ -240,7 +245,8 @@ export default function CrmPage() {
   }, [viewMode, loading]);
 
   return (
-    <div className="flex h-screen w-full bg-background overflow-hidden text-slate-900 font-[family-name:var(--font-sans)]">
+    <FeedbackProvider>
+      <div className="flex h-screen w-full bg-background overflow-hidden text-slate-900 font-[family-name:var(--font-sans)]">
       {/* Sidebar */}
       <aside className="w-16 flex flex-col items-center py-6 bg-card border-r border-border shrink-0">
         <div className="mb-8 w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-primary/30">D</div>
@@ -298,8 +304,8 @@ export default function CrmPage() {
       <LeadDrawer lead={selectedLead} onClose={() => setSelectedLeadId(null)} users={users} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} />
       
       {error && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-2 rounded-full shadow-2xl z-50 flex items-center gap-2"><span className="material-icons">warning</span> {error} <button onClick={() => setError(null)}>✕</button></div>}
-      {toast && <Toast message={toast.message} tone={toast.tone} onClose={() => setToast(null)} onRetry={error ? refreshAll : undefined} />}
-    </div>
+      </div>
+    </FeedbackProvider>
   );
 }
 
