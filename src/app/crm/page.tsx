@@ -58,6 +58,8 @@ interface LeadMemo {
   leadId: number;
   authorName: string;
   body: string;
+  version?: number;
+  updatedAt?: string;
   createdAt: string;
 }
 
@@ -142,7 +144,10 @@ function CrmShell() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [memos, setMemos] = useState<LeadMemo[]>([]);
   const [memoInput, setMemoInput] = useState("");
+  const [memoLoading, setMemoLoading] = useState(false);
   const [memoSaving, setMemoSaving] = useState(false);
+  const [editingMemoId, setEditingMemoId] = useState<number | null>(null);
+  const [editingBody, setEditingBody] = useState("");
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<CrmStatus | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -150,6 +155,7 @@ function CrmShell() {
   const { pushToast } = useToast();
   const { start: startLoading, stop: stopLoading } = useLoading();
   const apiKey = process.env.NEXT_PUBLIC_API_KEY || "";
+  const currentUser = process.env.NEXT_PUBLIC_USER_NAME || "상담원";
   const [pollTick, setPollTick] = useState(0);
 
   const fetchUsers = useCallback(async () => {
@@ -250,6 +256,7 @@ function CrmShell() {
   useEffect(() => {
     const fetchMemos = async (id: number) => {
       try {
+        setMemoLoading(true);
         const res = await fetch(`/api/crm/leads/${id}/memos`, {
           headers: apiKey ? { "x-api-key": apiKey } : undefined,
         });
@@ -258,6 +265,8 @@ function CrmShell() {
         setMemos(json.data || []);
       } catch (e) {
         pushToast(e instanceof Error ? e.message : "메모 조회 실패", "error");
+      } finally {
+        setMemoLoading(false);
       }
     };
     if (selectedLeadId) {
@@ -332,7 +341,7 @@ function CrmShell() {
       const res = await fetch(`/api/crm/leads/${leadId}/memos`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(apiKey ? { "x-api-key": apiKey } : {}) },
-        body: JSON.stringify({ authorName: "상담원", body: memoInput.trim() }),
+        body: JSON.stringify({ authorName: currentUser, body: memoInput.trim() }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "메모 저장 실패");
@@ -343,6 +352,63 @@ function CrmShell() {
       pushToast(e instanceof Error ? e.message : "메모 저장 실패", "error");
     } finally {
       setMemoSaving(false);
+    }
+  };
+
+  const startEditMemo = (memo: LeadMemo) => {
+    setEditingMemoId(memo.id);
+    setEditingBody(memo.body);
+  };
+
+  const cancelEditMemo = () => {
+    setEditingMemoId(null);
+    setEditingBody("");
+  };
+
+  const updateMemo = async (memo: LeadMemo) => {
+    if (!editingBody.trim()) {
+      pushToast("메모를 입력하세요.", "error");
+      return;
+    }
+    if (editingBody.length > 2000) {
+      pushToast("메모는 2000자 이하로 작성해주세요.", "error");
+      return;
+    }
+    try {
+      setMemoSaving(true);
+      const res = await fetch(`/api/crm/leads/${memo.leadId}/memos/${memo.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...(apiKey ? { "x-api-key": apiKey } : {}) },
+        body: JSON.stringify({ body: editingBody.trim(), version: memo.version || 1 }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "메모 수정 실패");
+      setMemos(prev => prev.map(m => m.id === memo.id ? { ...m, ...json.data } : m));
+      cancelEditMemo();
+      pushToast("메모가 수정되었습니다.", "success");
+    } catch (e) {
+      pushToast(e instanceof Error ? e.message : "메모 수정 실패", "error");
+    } finally {
+      setMemoSaving(false);
+    }
+  };
+
+  const deleteMemo = async (memo: LeadMemo) => {
+    if (!confirm("메모를 삭제하시겠습니까?")) return;
+    try {
+      const res = await fetch(`/api/crm/leads/${memo.leadId}/memos/${memo.id}`, {
+        method: "DELETE",
+        headers: apiKey ? { "x-api-key": apiKey } : undefined,
+      });
+      if (!res.ok && res.status !== 204) {
+        const json = await res.json();
+        throw new Error(json.message || "메모 삭제 실패");
+      }
+      setMemos(prev => prev.filter(m => m.id !== memo.id));
+      if (editingMemoId === memo.id) cancelEditMemo();
+      pushToast("메모가 삭제되었습니다.", "success");
+    } catch (e) {
+      pushToast(e instanceof Error ? e.message : "메모 삭제 실패", "error");
     }
   };
 
@@ -446,8 +512,17 @@ function CrmShell() {
         memos={memos}
         memoInput={memoInput}
         memoSaving={memoSaving}
+        memoLoading={memoLoading}
+        currentUser={currentUser}
         onMemoInput={setMemoInput}
         onSaveMemo={() => selectedLeadId && saveMemo(selectedLeadId)}
+        onEditMemo={startEditMemo}
+        onCancelEdit={cancelEditMemo}
+        onConfirmEdit={updateMemo}
+        editingMemoId={editingMemoId}
+        editingBody={editingBody}
+        onEditingBody={setEditingBody}
+        onDeleteMemo={deleteMemo}
       />
       
       {error && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-2 rounded-full shadow-2xl z-50 flex items-center gap-2"><span className="material-icons">warning</span> {error} <button onClick={() => setError(null)}>✕</button></div>}
@@ -574,7 +649,55 @@ function CalendarView({ events }: { events: CalendarEvent[] }) {
   );
 }
 
-function LeadDrawer({ lead, loading, error, onRetry, onClose, users, onStatus, onAssignee, onSchedule, memos, memoInput, onMemoInput, onSaveMemo, memoSaving }: { lead: Lead | null; loading?: boolean; error?: string | null; onRetry?: () => void; onClose: () => void; users: User[]; onStatus: (id: number, s: CrmStatus) => Promise<void>; onAssignee: (id: number, userId: number | null) => Promise<void>; onSchedule: (id: number, field: string, val: string) => Promise<void>; memos: LeadMemo[]; memoInput: string; onMemoInput: (v: string) => void; onSaveMemo: () => void; memoSaving: boolean; }) {
+function LeadDrawer({
+  lead,
+  loading,
+  error,
+  onRetry,
+  onClose,
+  users,
+  onStatus,
+  onAssignee,
+  onSchedule,
+  memos,
+  memoInput,
+  onMemoInput,
+  onSaveMemo,
+  memoSaving,
+  memoLoading,
+  currentUser,
+  onEditMemo,
+  onCancelEdit,
+  onConfirmEdit,
+  editingMemoId,
+  editingBody,
+  onEditingBody,
+  onDeleteMemo,
+}: {
+  lead: Lead | null;
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+  onClose: () => void;
+  users: User[];
+  onStatus: (id: number, s: CrmStatus) => Promise<void>;
+  onAssignee: (id: number, userId: number | null) => Promise<void>;
+  onSchedule: (id: number, field: string, val: string) => Promise<void>;
+  memos: LeadMemo[];
+  memoInput: string;
+  onMemoInput: (v: string) => void;
+  onSaveMemo: () => void;
+  memoSaving: boolean;
+  memoLoading: boolean;
+  currentUser: string;
+  onEditMemo: (m: LeadMemo) => void;
+  onCancelEdit: () => void;
+  onConfirmEdit: (m: LeadMemo) => void;
+  editingMemoId: number | null;
+  editingBody: string;
+  onEditingBody: (v: string) => void;
+  onDeleteMemo: (m: LeadMemo) => void;
+}) {
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -627,7 +750,7 @@ function LeadDrawer({ lead, loading, error, onRetry, onClose, users, onStatus, o
               <section className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-[10px] font-bold text-slate-400 uppercase">직원 메모</h4>
-                  <span className="text-[10px] text-slate-400">{memoInput.length}/2000</span>
+                  <span className={`text-[10px] ${memoInput.length > 1800 ? "text-red-500" : "text-slate-400"}`}>{memoInput.length}/2000</span>
                 </div>
                 <textarea
                   value={memoInput}
@@ -636,6 +759,12 @@ function LeadDrawer({ lead, loading, error, onRetry, onClose, users, onStatus, o
                   rows={3}
                   className="w-full border border-slate-200 rounded-lg p-3 text-sm resize-none focus:ring-primary/30 focus:outline-none"
                   placeholder="통화 특이사항을 기록하세요."
+                  onKeyDown={(e) => {
+                    if (e.ctrlKey && e.key === "Enter") {
+                      e.preventDefault();
+                      onSaveMemo();
+                    }
+                  }}
                 />
                 <div className="flex justify-end">
                   <button
@@ -647,16 +776,46 @@ function LeadDrawer({ lead, loading, error, onRetry, onClose, users, onStatus, o
                   </button>
                 </div>
                 <div className="space-y-2">
-                  {memos.map((m) => (
-                    <div key={m.id} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
-                      <div className="text-[11px] text-slate-500 flex justify-between">
-                        <span className="font-semibold text-slate-600">{m.authorName}</span>
-                        <span>{new Date(m.createdAt).toLocaleString()}</span>
+                  {memoLoading && <div className="text-sm text-slate-400">메모를 불러오는 중...</div>}
+                  {!memoLoading && memos.map((m) => {
+                    const isOwner = m.authorName === currentUser;
+                    const isEditing = editingMemoId === m.id;
+                    return (
+                      <div key={m.id} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                        <div className="text-[11px] text-slate-500 flex justify-between">
+                          <span className="font-semibold text-slate-600">{m.authorName}</span>
+                          <span title={new Date(m.createdAt).toLocaleString()}>{new Date(m.createdAt).toLocaleString()}</span>
+                        </div>
+                        {isEditing ? (
+                          <>
+                            <textarea
+                              value={editingBody}
+                              onChange={(e) => onEditingBody(e.target.value)}
+                              maxLength={2000}
+                              className="mt-2 w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-primary/30 focus:outline-none"
+                              rows={3}
+                            />
+                            <div className="mt-2 flex gap-2 justify-end text-xs">
+                              <button onClick={() => onConfirmEdit(m)} disabled={memoSaving} className={`px-3 py-1 rounded bg-primary text-white ${memoSaving ? "opacity-70" : ""}`}>저장</button>
+                              <button onClick={onCancelEdit} className="px-3 py-1 rounded bg-slate-100">취소</button>
+                            </div>
+                          </>
+                        ) : (
+                          <p className="mt-1 text-sm text-slate-800 whitespace-pre-wrap">{escapeHtml(m.body)}</p>
+                        )}
+                        <div className="mt-2 flex gap-2 justify-end text-[11px] text-slate-500">
+                          <span>{m.version ? `v${m.version}` : ""}</span>
+                          {isOwner && !isEditing && (
+                            <>
+                              <button onClick={() => onEditMemo(m)} className="underline">수정</button>
+                              <button onClick={() => onDeleteMemo(m)} className="underline text-red-500">삭제</button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <p className="mt-1 text-sm text-slate-800 whitespace-pre-wrap">{m.body}</p>
-                    </div>
-                  ))}
-                  {memos.length === 0 && <div className="text-sm text-slate-400">메모가 없습니다.</div>}
+                    );
+                  })}
+                  {!memoLoading && memos.length === 0 && <div className="text-sm text-slate-400">메모가 없습니다.</div>}
                 </div>
               </section>
             </>
@@ -700,4 +859,13 @@ function Legend() {
       <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-100 border border-amber-200"></span>연령 뱃지</span>
     </div>
   );
+}
+
+function escapeHtml(text: string) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

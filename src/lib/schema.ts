@@ -49,6 +49,8 @@ export const leadMemos = pgTable(
     leadId: integer("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
     authorName: text("author_name").notNull(),
     body: text("body").notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    version: integer("version").default(1).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({

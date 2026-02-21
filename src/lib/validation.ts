@@ -97,6 +97,11 @@ export const memoCreateSchema = z.object({
   body: z.string().min(1).max(2000),
 });
 
+export const memoUpdateSchema = z.object({
+  body: z.string().min(1).max(2000),
+  version: z.number().int().positive(),
+});
+
 export const crmUserCreateSchema = z.object({
   name: z.string().min(1, "상담원 이름은 필수입니다."),
 });
