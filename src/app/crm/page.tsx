@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRef } from "react";
 
 type ViewMode = "kanban" | "list" | "calendar";
 type Scope = "all" | "mine";
@@ -107,6 +108,7 @@ export default function CrmPage() {
   const [dragOverStatus, setDragOverStatus] = useState<CrmStatus | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [toast, setToast] = useState<{ message: string; tone?: "error" | "success" | "info" } | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -228,7 +230,14 @@ export default function CrmPage() {
     if (node) {
       node.focus();
     }
-  }, [viewMode]);
+  }, []);
+
+  // View 전환 또는 데이터 로딩이 끝난 후 검색창에 포커스 이동 (접근성)
+  useEffect(() => {
+    if (!loading && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [viewMode, loading]);
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden text-slate-900 font-[family-name:var(--font-sans)]">
@@ -252,9 +261,9 @@ export default function CrmPage() {
           <div className="flex items-center gap-6">
             <h1 className="text-xl font-bold">접수 현황</h1>
             <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
-              <button onClick={() => setViewMode("kanban")} disabled={loading} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "kanban" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">view_kanban</span> 칸반</button>
-              <button onClick={() => setViewMode("list")} disabled={loading} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">view_list</span> 리스트</button>
-              <button onClick={() => setViewMode("calendar")} disabled={loading} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "calendar" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">calendar_today</span> 캘린더</button>
+              <button aria-pressed={viewMode === "kanban"} onClick={() => setViewMode("kanban")} disabled={loading} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "kanban" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">view_kanban</span> 칸반</button>
+              <button aria-pressed={viewMode === "list"} onClick={() => setViewMode("list")} disabled={loading} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">view_list</span> 리스트</button>
+              <button aria-pressed={viewMode === "calendar"} onClick={() => setViewMode("calendar")} disabled={loading} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "calendar" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">calendar_today</span> 캘린더</button>
             </div>
             
             <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg shrink-0 ml-2">
@@ -269,7 +278,7 @@ export default function CrmPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="relative"><span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">search</span><input type="text" placeholder="환자명, 전화번호..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-64 bg-slate-100 border-none rounded-lg py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary/20" /></div>
+            <div className="relative"><span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">search</span><input ref={searchInputRef} type="text" placeholder="환자명, 전화번호..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-64 bg-slate-100 border-none rounded-lg py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary/20" /></div>
             <select value={selectedUserId || ""} onChange={(e) => { const v = e.target.value ? Number(e.target.value) : null; setSelectedUserId(v); if(v) setScope("mine"); }} className="bg-card border border-border rounded-lg px-3 py-2 text-sm font-medium">
               <option value="">전체 상담원</option>
               {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
