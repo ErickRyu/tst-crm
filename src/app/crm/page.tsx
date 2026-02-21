@@ -150,6 +150,7 @@ function CrmShell() {
   const { pushToast } = useToast();
   const { start: startLoading, stop: stopLoading } = useLoading();
   const apiKey = process.env.NEXT_PUBLIC_API_KEY || "";
+  const [pollTick, setPollTick] = useState(0);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -206,6 +207,16 @@ function CrmShell() {
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
   useEffect(() => { refreshAll(); }, [refreshAll]);
+  // 30초 폴링으로 실시간성 보강
+  useEffect(() => {
+    const t = setInterval(() => {
+      setPollTick((v) => v + 1);
+    }, 30000);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    void refreshAll();
+  }, [pollTick, refreshAll]);
 
   // 상세 패널 데이터 최신화
   useEffect(() => {
