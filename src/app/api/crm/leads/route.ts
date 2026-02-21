@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, asc, desc, eq, inArray, sql, SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, sql, SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { leads } from "@/lib/schema";
 import {

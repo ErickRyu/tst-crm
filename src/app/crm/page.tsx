@@ -122,6 +122,9 @@ function CrmShell() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
+  const [detailLead, setDetailLead] = useState<Lead | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<CrmStatus | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -136,9 +139,9 @@ function CrmShell() {
       setUsers((json.data || []) as User[]);
     } catch {
       setError("상담원 목록 조회 실패");
-      setToast({ message: "상담원 목록 조회 실패", tone: "error" });
+      pushToast("상담원 목록 조회 실패", "error");
     }
-  }, []);
+  }, [pushToast]);
 
   const fetchLeads = useCallback(async () => {
     const qs = new URLSearchParams({ 
@@ -184,6 +187,33 @@ function CrmShell() {
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
   useEffect(() => { refreshAll(); }, [refreshAll]);
+
+  // 상세 패널 데이터 최신화
+  useEffect(() => {
+    const fetchDetail = async (id: number) => {
+      try {
+        setDetailLoading(true);
+        setDetailError(null);
+        const res = await fetch(`/api/leads/${id}`);
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || "상세 조회 실패");
+        const base = leads.find((l) => l.id === id);
+        setDetailLead({ ...(base || {} as Lead), ...(json.data || {}) });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "상세 조회 실패";
+        setDetailError(msg);
+        pushToast(msg, "error");
+      } finally {
+        setDetailLoading(false);
+      }
+    };
+    if (selectedLeadId) {
+      void fetchDetail(selectedLeadId);
+    } else {
+      setDetailLead(null);
+      setDetailError(null);
+    }
+  }, [selectedLeadId, leads, pushToast]);
 
   const updateStatus = async (id: number, status: CrmStatus) => {
     try {
@@ -275,7 +305,10 @@ function CrmShell() {
         </nav>
         <div className="mt-auto flex flex-col gap-4">
           <button className="p-3 text-slate-400"><span className="material-icons">settings</span></button>
-          <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white overflow-hidden"><img src="https://lh3.googleusercontent.com/a/default-user" alt="User" /></div>
+          <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="https://lh3.googleusercontent.com/a/default-user" alt="User" />
+          </div>
         </div>
       </aside>
 
@@ -319,7 +352,17 @@ function CrmShell() {
         </div>
       </main>
 
-      <LeadDrawer lead={selectedLead} onClose={() => setSelectedLeadId(null)} users={users} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} />
+      <LeadDrawer
+        lead={detailLead || selectedLead}
+        loading={detailLoading}
+        error={detailError}
+        onRetry={() => selectedLeadId && setSelectedLeadId(selectedLeadId)}
+        onClose={() => setSelectedLeadId(null)}
+        users={users}
+        onStatus={updateStatus}
+        onAssignee={updateAssignee}
+        onSchedule={updateSchedule}
+      />
       
       {error && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-2 rounded-full shadow-2xl z-50 flex items-center gap-2"><span className="material-icons">warning</span> {error} <button onClick={() => setError(null)}>✕</button></div>}
       </div>
@@ -327,7 +370,7 @@ function CrmShell() {
   );
 }
 
-function KanbanView({ grouped, users, onSelect, selectedId, onStatus, onAssignee, onSchedule, draggingId, setDraggingId, dragOverStatus, setDragOverStatus }: KanbanProps) {
+function KanbanView({ grouped, users, onSelect, selectedId, onStatus, draggingId, setDraggingId, dragOverStatus, setDragOverStatus }: KanbanProps) {
   return (
     <div className="flex gap-4 h-full overflow-x-auto pb-4 items-start">
       {statusOptions.map(status => (
@@ -440,22 +483,59 @@ function CalendarView({ events }: { events: CalendarEvent[] }) {
   );
 }
 
-function LeadDrawer({ lead, onClose, users, onStatus, onAssignee, onSchedule }: any) {
-  if (!lead) return null;
+function LeadDrawer({ lead, loading, error, onRetry, onClose, users, onStatus, onAssignee, onSchedule }: { lead: Lead | null; loading?: boolean; error?: string | null; onRetry?: () => void; onClose: () => void; users: User[]; onStatus: (id: number, s: CrmStatus) => Promise<void>; onAssignee: (id: number, userId: number | null) => Promise<void>; onSchedule: (id: number, field: string, val: string) => Promise<void>; }) {
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (lead && closeBtnRef.current) {
+      closeBtnRef.current.focus();
+    }
+  }, [lead]);
+
+  if (!lead && !loading && !error) return null;
   return (
     <>
       <div className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm" onClick={onClose}></div>
       <aside className="fixed top-0 right-0 z-40 h-full w-[420px] bg-white shadow-2xl flex flex-col translate-x-0 transition-transform">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
-          <div className="flex items-center gap-4"><div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-primary font-bold text-xl">{lead.name[0]}</div><div><h2 className="font-bold text-lg">{lead.name}</h2><div className="text-sm text-slate-500">{lead.phone}</div></div></div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><span className="material-icons">close</span></button>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-primary font-bold text-xl">{lead?.name?.[0] || "?"}</div>
+            <div>
+              <h2 className="font-bold text-lg">{lead?.name || (loading ? "불러오는 중..." : "데이터 없음")}</h2>
+              <div className="text-sm text-slate-500">{lead?.phone || ""}</div>
+            </div>
+          </div>
+          <button ref={closeBtnRef} onClick={onClose} className="text-slate-400 hover:text-slate-600"><span className="material-icons">close</span></button>
         </div>
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
-          <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-3">상태 변경</h4><div className="grid grid-cols-2 gap-2">{statusOptions.map(s => <button key={s} onClick={() => onStatus(lead.id, s)} className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all ${lead.crmStatus === s ? 'bg-primary/5 border-primary text-primary shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{s}</button>)}</div></section>
-          <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">담당 상담원</h4><select value={lead.assigneeId || ""} onChange={e => onAssignee(lead.id, Number(e.target.value) || null)} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm">{users.map((u:any) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></section>
-          <section className="grid grid-cols-2 gap-4"><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">팔로업 일정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.followUpAt)} onBlur={e => onSchedule(lead.id, "followUpAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">예약 확정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onBlur={e => onSchedule(lead.id, "appointmentAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div></section>
+          {loading && (
+            <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2">
+              <span className="material-icons animate-spin">refresh</span>
+              <span className="text-sm">상세 정보를 불러오는 중</span>
+            </div>
+          )}
+          {!loading && error && (
+            <div className="flex flex-col items-center justify-center h-full text-slate-500 gap-3">
+              <span className="material-icons text-red-500 text-3xl">error</span>
+              <div className="text-sm font-semibold">{error}</div>
+              <div className="flex gap-2">
+                <button onClick={onRetry} className="px-3 py-1.5 rounded-lg bg-primary text-white text-sm">재시도</button>
+                <button onClick={onClose} className="px-3 py-1.5 rounded-lg bg-slate-100 text-sm">닫기</button>
+              </div>
+            </div>
+          )}
+          {!loading && !error && lead && (
+            <>
+              <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-3">상태 변경</h4><div className="grid grid-cols-2 gap-2">{statusOptions.map(s => <button key={s} onClick={() => onStatus(lead.id, s)} className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all ${lead.crmStatus === s ? 'bg-primary/5 border-primary text-primary shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{s}</button>)}</div></section>
+              <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">담당 상담원</h4><select value={lead.assigneeId || ""} onChange={e => onAssignee(lead.id, Number(e.target.value) || null)} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm">{users.map((u: User) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></section>
+              <section className="grid grid-cols-2 gap-4"><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">팔로업 일정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.followUpAt)} onBlur={e => onSchedule(lead.id, "followUpAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">예약 확정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onBlur={e => onSchedule(lead.id, "appointmentAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div></section>
+            </>
+          )}
         </div>
-        <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex gap-3 shrink-0"><button className="flex-1 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600">부재중 전송</button><button className="flex-1 py-2.5 bg-primary text-white rounded-lg text-sm font-medium shadow-lg shadow-primary/20">예약 하기</button></div>
+        <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex gap-3 shrink-0">
+          <button className="flex-1 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600" disabled>부재중 전송</button>
+          <button className="flex-1 py-2.5 bg-primary text-white rounded-lg text-sm font-medium shadow-lg shadow-primary/20" disabled>예약 하기</button>
+        </div>
       </aside>
     </>
   );
@@ -468,26 +548,6 @@ function SkeletonOverlay({ viewMode }: { viewMode: ViewMode }) {
         <span className="material-icons animate-spin">refresh</span>
         <span className="text-xs font-medium">{viewMode === "kanban" ? "칸반 데이터를 불러오는 중" : viewMode === "list" ? "리스트 데이터를 불러오는 중" : "캘린더를 불러오는 중"}</span>
       </div>
-    </div>
-  );
-}
-
-function Toast({ message, tone = "info", onClose, onRetry }: { message: string; tone?: "error" | "success" | "info"; onClose: () => void; onRetry?: () => void }) {
-  useEffect(() => {
-    const t = setTimeout(onClose, 3500);
-    return () => clearTimeout(t);
-  }, [onClose]);
-  const toneClasses = {
-    error: "bg-red-600 text-white",
-    success: "bg-emerald-600 text-white",
-    info: "bg-slate-800 text-white",
-  };
-  return (
-    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full shadow-2xl z-50 flex items-center gap-2 text-sm ${toneClasses[tone]}`}>
-      <span className="material-icons text-base">{tone === "error" ? "error" : tone === "success" ? "check_circle" : "info"}</span>
-      <span>{message}</span>
-      {onRetry && <button onClick={onRetry} className="underline text-xs">재시도</button>}
-      <button onClick={onClose} className="text-white/80 hover:text-white"><span className="material-icons text-sm">close</span></button>
     </div>
   );
 }
