@@ -10,15 +10,10 @@ export async function GET(request: NextRequest) {
     const fromParam = searchParams.get("from");
     const toParam = searchParams.get("to");
 
-    if (!assigneeIdParam) {
-      return NextResponse.json(
-        { code: 400, message: "assigneeId가 필요합니다." },
-        { status: 400 }
-      );
-    }
-
-    const assigneeId = Number.parseInt(assigneeIdParam, 10);
-    if (Number.isNaN(assigneeId)) {
+    const assigneeId = assigneeIdParam
+      ? Number.parseInt(assigneeIdParam, 10)
+      : null;
+    if (assigneeIdParam && Number.isNaN(assigneeId)) {
       return NextResponse.json(
         { code: 400, message: "유효하지 않은 assigneeId입니다." },
         { status: 400 }
@@ -34,7 +29,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const conditions: SQL[] = [eq(leads.assigneeId, assigneeId)];
+    const conditions: SQL[] = [];
+
+    if (assigneeId !== null) {
+      conditions.push(eq(leads.assigneeId, assigneeId));
+    }
 
     if (from && to) {
       conditions.push(
@@ -45,7 +44,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const where = and(...conditions);
+    const where = conditions.length ? and(...conditions) : undefined;
     const rows = await db.select().from(leads).where(where);
 
     const events = rows.flatMap((lead) => {

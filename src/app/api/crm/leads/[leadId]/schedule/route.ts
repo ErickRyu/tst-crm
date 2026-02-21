@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, and, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { leads } from "@/lib/schema";
 import { crmScheduleUpdateSchema } from "@/lib/validation";
@@ -38,6 +38,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const updates: {
       followUpAt?: Date | null;
       appointmentAt?: Date | null;
+      updatedAt?: Date;
+      version?: SQL | number;
     } = {};
 
     if (Object.prototype.hasOwnProperty.call(parsed.data, "followUpAt")) {
@@ -55,16 +57,23 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       );
     }
 
+    const where = parsed.data.version
+      ? and(eq(leads.id, id), eq(leads.version, parsed.data.version))
+      : eq(leads.id, id);
+
+    updates.updatedAt = new Date();
+    updates.version = sql`${leads.version} + 1`;
+
     const [updated] = await db
       .update(leads)
       .set(updates)
-      .where(eq(leads.id, id))
+      .where(where)
       .returning();
 
     if (!updated) {
       return NextResponse.json(
-        { code: 404, message: "리드를 찾을 수 없습니다." },
-        { status: 404 }
+        { code: 409, message: "다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요." },
+        { status: 409 }
       );
     }
 

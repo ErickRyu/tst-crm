@@ -38,6 +38,9 @@ interface Lead {
   monthsUntil65: number | null;
   careTag: string;
   priorityRank: number;
+  version: number;
+  updatedAt: string;
+  contactFailCount?: number;
 }
 
 interface CalendarEvent {
@@ -151,29 +154,35 @@ export default function CrmPage() {
 
   const updateStatus = async (id: number, status: CrmStatus) => {
     try {
+      const version = leads.find(l => l.id === id)?.version;
       const res = await fetch(`/api/crm/leads/${id}/status`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ crmStatus: status }),
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ crmStatus: status, version }),
       });
       if (res.ok) await refreshAll();
+      else if (res.status === 409) setError("다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요.");
       else setError("상태 변경 실패");
     } catch { setError("서버 통신 오류"); }
   };
 
   const updateAssignee = async (id: number, assigneeId: number | null) => {
     try {
+      const version = leads.find(l => l.id === id)?.version;
       const res = await fetch(`/api/crm/leads/${id}/assign`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assigneeId }),
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assigneeId, version }),
       });
       if (res.ok) await refreshAll();
+      else if (res.status === 409) setError("다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요.");
     } catch { setError("할당 변경 실패"); }
   };
 
   const updateSchedule = async (id: number, field: string, value: string) => {
     try {
+      const version = leads.find(l => l.id === id)?.version;
       const res = await fetch(`/api/crm/leads/${id}/schedule`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [field]: value ? new Date(value).toISOString() : null }),
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [field]: value ? new Date(value).toISOString() : null, version }),
       });
       if (res.ok) await refreshAll();
+      else if (res.status === 409) setError("다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요.");
     } catch { setError("일정 변경 실패"); }
   };
 

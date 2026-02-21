@@ -26,6 +26,9 @@ function serializeLead(row: typeof leads.$inferSelect) {
     isSenior65Plus: senior.isSenior65Plus,
     monthsUntil65: senior.monthsUntil65,
     careTag: row.category,
+    version: row.version,
+    updatedAt: row.updatedAt,
+    contactFailCount: row.contactFailCount,
   };
 }
 
@@ -76,7 +79,12 @@ export async function GET(request: NextRequest) {
       .select()
       .from(leads)
       .where(where)
-      .orderBy(priorityCase, sql`coalesce(${leads.lastCallAt}, ${leads.createdAt}) asc`, asc(leads.createdAt), desc(leads.id))
+      .orderBy(
+        priorityCase,
+        sql`coalesce(${leads.lastCallAt}, ${leads.createdAt}) asc`,
+        asc(leads.createdAt),
+        asc(leads.id)
+      )
       .limit(limit);
 
     const data = rows.map(serializeLead);
@@ -93,7 +101,8 @@ export async function GET(request: NextRequest) {
         doneStatuses: DONE_STATUSES,
       },
     });
-  } catch {
+  } catch (e) {
+    console.error("[crm/leads] GET error", e);
     return NextResponse.json(
       { code: 400, message: "잘못된 요청입니다." },
       { status: 400 }

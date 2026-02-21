@@ -43,5 +43,8 @@ export const leads = pgTable("leads", {
   lastCallAt: timestamp("last_call_at"),
   followUpAt: timestamp("follow_up_at"),
   appointmentAt: timestamp("appointment_at"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  version: integer("version").default(1).notNull(),
+  contactFailCount: integer("contact_fail_count").default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

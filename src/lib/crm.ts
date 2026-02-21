@@ -46,11 +46,17 @@ export function calculateSeniorBadge(birthDate: Date | string | null) {
   }
 
   const today = new Date();
-  const seniorDate = new Date(
-    birth.getFullYear() + 65,
-    birth.getMonth(),
-    birth.getDate()
-  );
+  const targetYear = birth.getFullYear() + 65;
+  const birthMonth = birth.getMonth();
+  const birthDay = birth.getDate();
+
+  // 윤년 2/29 보정: 해당 연도에 2/29가 없으면 2/28 24:00로 간주
+  let seniorDate = new Date(targetYear, birthMonth, birthDay);
+  if (Number.isNaN(seniorDate.getTime())) {
+    if (birthMonth === 1 && birthDay === 29) {
+      seniorDate = new Date(targetYear, 1, 28, 24, 0, 0);
+    }
+  }
 
   const isSenior65Plus = today >= seniorDate;
   const monthsUntil65 = isSenior65Plus ? 0 : diffInMonths(today, seniorDate);
