@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, useEffect, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 
 type Tone = "error" | "success" | "info";
 
@@ -130,7 +130,9 @@ function ToastItem({ toast }: { toast: Toast }) {
           재시도
         </button>
       )}
-      <button onClick={() => dismiss(toast.id)} className="text-white/80 hover:text-white" aria-label="닫기"><span className="material-icons text-sm">close</span></button>
+      <button onClick={() => dismiss(toast.id)} className="text-white/80 hover:text-white" aria-label="닫기">
+        <span className="material-icons text-sm">close</span>
+      </button>
     </div>
   );
 }

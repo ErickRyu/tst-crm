@@ -9,15 +9,6 @@ export function middleware(request: NextRequest) {
     });
   }
 
-  // API Key authentication
-  const apiKey = request.headers.get("x-api-key");
-  if (apiKey !== process.env.API_KEY) {
-    return NextResponse.json(
-      { code: 401, message: "인증이 필요합니다." },
-      { status: 401, headers: corsHeaders() }
-    );
-  }
-
   const response = NextResponse.next();
   for (const [key, value] of Object.entries(corsHeaders())) {
     response.headers.set(key, value);
@@ -35,5 +26,6 @@ function corsHeaders(): Record<string, string> {
 }
 
 export const config = {
-  matcher: ["/api/leads/:path*"],
+  // 인증은 나중에 로그인 기능 추가 시 다시 활성화
+  matcher: [],
 };

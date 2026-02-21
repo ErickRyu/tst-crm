@@ -53,6 +53,14 @@ interface CalendarEvent {
   at: string;
 }
 
+interface LeadMemo {
+  id: number;
+  leadId: number;
+  authorName: string;
+  body: string;
+  createdAt: string;
+}
+
 // Props Interfaces
 interface ViewProps {
   leads: Lead[];
@@ -125,12 +133,16 @@ function CrmShell() {
   const [detailLead, setDetailLead] = useState<Lead | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [memos, setMemos] = useState<LeadMemo[]>([]);
+  const [memoInput, setMemoInput] = useState("");
+  const [memoSaving, setMemoSaving] = useState(false);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<CrmStatus | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const { pushToast } = useToast();
   const { start: startLoading, stop: stopLoading } = useLoading();
+  const apiKey = process.env.NEXT_PUBLIC_API_KEY || "";
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -194,7 +206,9 @@ function CrmShell() {
       try {
         setDetailLoading(true);
         setDetailError(null);
-        const res = await fetch(`/api/leads/${id}`);
+        const res = await fetch(`/api/leads/${id}`, {
+          headers: apiKey ? { "x-api-key": apiKey } : undefined,
+        });
         const json = await res.json();
         if (!res.ok) throw new Error(json.message || "상세 조회 실패");
         const base = leads.find((l) => l.id === id);
@@ -213,7 +227,27 @@ function CrmShell() {
       setDetailLead(null);
       setDetailError(null);
     }
-  }, [selectedLeadId, leads, pushToast]);
+  }, [selectedLeadId, leads, pushToast, apiKey]);
+
+  useEffect(() => {
+    const fetchMemos = async (id: number) => {
+      try {
+        const res = await fetch(`/api/crm/leads/${id}/memos`, {
+          headers: apiKey ? { "x-api-key": apiKey } : undefined,
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || "메모 조회 실패");
+        setMemos(json.data || []);
+      } catch (e) {
+        pushToast(e instanceof Error ? e.message : "메모 조회 실패", "error");
+      }
+    };
+    if (selectedLeadId) {
+      void fetchMemos(selectedLeadId);
+    } else {
+      setMemos([]);
+    }
+  }, [selectedLeadId, pushToast, apiKey]);
 
   const updateStatus = async (id: number, status: CrmStatus) => {
     try {
@@ -264,6 +298,34 @@ function CrmShell() {
         pushToast("다른 상담원이 먼저 변경했습니다.", "error");
       }
     } catch { setError("일정 변경 실패"); pushToast("일정 변경 실패", "error"); }
+  };
+
+  const saveMemo = async (leadId: number) => {
+    if (!memoInput.trim()) {
+      pushToast("메모를 입력하세요.", "error");
+      return;
+    }
+    if (memoInput.length > 2000) {
+      pushToast("메모는 2000자 이하로 작성해주세요.", "error");
+      return;
+    }
+    try {
+      setMemoSaving(true);
+      const res = await fetch(`/api/crm/leads/${leadId}/memos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(apiKey ? { "x-api-key": apiKey } : {}) },
+        body: JSON.stringify({ authorName: "상담원", body: memoInput.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "메모 저장 실패");
+      setMemos(prev => [{ ...(json.data as LeadMemo) }, ...prev]);
+      setMemoInput("");
+      pushToast("메모가 저장되었습니다.", "success");
+    } catch (e) {
+      pushToast(e instanceof Error ? e.message : "메모 저장 실패", "error");
+    } finally {
+      setMemoSaving(false);
+    }
   };
 
   const filteredLeads = useMemo(() => {
@@ -362,6 +424,11 @@ function CrmShell() {
         onStatus={updateStatus}
         onAssignee={updateAssignee}
         onSchedule={updateSchedule}
+        memos={memos}
+        memoInput={memoInput}
+        memoSaving={memoSaving}
+        onMemoInput={setMemoInput}
+        onSaveMemo={() => selectedLeadId && saveMemo(selectedLeadId)}
       />
       
       {error && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-2 rounded-full shadow-2xl z-50 flex items-center gap-2"><span className="material-icons">warning</span> {error} <button onClick={() => setError(null)}>✕</button></div>}
@@ -483,7 +550,7 @@ function CalendarView({ events }: { events: CalendarEvent[] }) {
   );
 }
 
-function LeadDrawer({ lead, loading, error, onRetry, onClose, users, onStatus, onAssignee, onSchedule }: { lead: Lead | null; loading?: boolean; error?: string | null; onRetry?: () => void; onClose: () => void; users: User[]; onStatus: (id: number, s: CrmStatus) => Promise<void>; onAssignee: (id: number, userId: number | null) => Promise<void>; onSchedule: (id: number, field: string, val: string) => Promise<void>; }) {
+function LeadDrawer({ lead, loading, error, onRetry, onClose, users, onStatus, onAssignee, onSchedule, memos, memoInput, onMemoInput, onSaveMemo, memoSaving }: { lead: Lead | null; loading?: boolean; error?: string | null; onRetry?: () => void; onClose: () => void; users: User[]; onStatus: (id: number, s: CrmStatus) => Promise<void>; onAssignee: (id: number, userId: number | null) => Promise<void>; onSchedule: (id: number, field: string, val: string) => Promise<void>; memos: LeadMemo[]; memoInput: string; onMemoInput: (v: string) => void; onSaveMemo: () => void; memoSaving: boolean; }) {
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -529,6 +596,41 @@ function LeadDrawer({ lead, loading, error, onRetry, onClose, users, onStatus, o
               <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-3">상태 변경</h4><div className="grid grid-cols-2 gap-2">{statusOptions.map(s => <button key={s} onClick={() => onStatus(lead.id, s)} className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all ${lead.crmStatus === s ? 'bg-primary/5 border-primary text-primary shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{s}</button>)}</div></section>
               <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">담당 상담원</h4><select value={lead.assigneeId || ""} onChange={e => onAssignee(lead.id, Number(e.target.value) || null)} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm">{users.map((u: User) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></section>
               <section className="grid grid-cols-2 gap-4"><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">팔로업 일정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.followUpAt)} onBlur={e => onSchedule(lead.id, "followUpAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">예약 확정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onBlur={e => onSchedule(lead.id, "appointmentAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div></section>
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase">직원 메모</h4>
+                  <span className="text-[10px] text-slate-400">{memoInput.length}/2000</span>
+                </div>
+                <textarea
+                  value={memoInput}
+                  onChange={(e) => onMemoInput(e.target.value)}
+                  maxLength={2000}
+                  rows={3}
+                  className="w-full border border-slate-200 rounded-lg p-3 text-sm resize-none focus:ring-primary/30 focus:outline-none"
+                  placeholder="통화 특이사항을 기록하세요."
+                />
+                <div className="flex justify-end">
+                  <button
+                    onClick={onSaveMemo}
+                    disabled={memoSaving}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium ${memoSaving ? "bg-slate-200 text-slate-500" : "bg-primary text-white shadow-sm"}`}
+                  >
+                    {memoSaving ? "저장 중..." : "메모 저장"}
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {memos.map((m) => (
+                    <div key={m.id} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                      <div className="text-[11px] text-slate-500 flex justify-between">
+                        <span className="font-semibold text-slate-600">{m.authorName}</span>
+                        <span>{new Date(m.createdAt).toLocaleString()}</span>
+                      </div>
+                      <p className="mt-1 text-sm text-slate-800 whitespace-pre-wrap">{m.body}</p>
+                    </div>
+                  ))}
+                  {memos.length === 0 && <div className="text-sm text-slate-400">메모가 없습니다.</div>}
+                </div>
+              </section>
             </>
           )}
         </div>
