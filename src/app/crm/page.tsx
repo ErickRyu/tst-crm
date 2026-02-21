@@ -409,6 +409,7 @@ function CrmShell() {
               <option value="">전체 상담원</option>
               {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
+            <Legend />
           </div>
         </header>
 
@@ -678,5 +679,14 @@ function TagChip({ label, tone }: { label: string; tone: "indigo" | "slate" | "a
     slate: "bg-slate-100 text-slate-700",
     amber: "bg-amber-50 text-amber-700",
   }[tone];
-  return <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${classes}`}>{label}</span>;
+  return <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${classes}`} title={label} aria-label={label}>{label}</span>;
+}
+
+function Legend() {
+  return (
+    <div className="flex items-center gap-2 text-[11px] text-slate-500">
+      <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-indigo-100 border border-indigo-200"></span>특화 진료</span>
+      <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-100 border border-amber-200"></span>연령 뱃지</span>
+    </div>
+  );
 }
