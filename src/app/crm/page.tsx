@@ -104,6 +104,14 @@ const statusStyles: Record<CrmStatus, { tone: string; badge: string; border: str
 };
 
 export default function CrmPage() {
+  return (
+    <FeedbackProvider>
+      <CrmShell />
+    </FeedbackProvider>
+  );
+}
+
+function CrmShell() {
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [scope, setScope] = useState<Scope>("all");
   const [includeDone, setIncludeDone] = useState(false);
