@@ -106,13 +106,17 @@ export default function CrmPage() {
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<CrmStatus | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [toast, setToast] = useState<{ message: string; tone?: "error" | "success" | "info" } | null>(null);
 
   const fetchUsers = useCallback(async () => {
     try {
       const res = await fetch("/api/crm/users");
       const json = await res.json();
       setUsers((json.data || []) as User[]);
-    } catch { setError("상담원 목록 조회 실패"); }
+    } catch {
+      setError("상담원 목록 조회 실패");
+      setToast({ message: "상담원 목록 조회 실패", tone: "error" });
+    }
   }, []);
 
   const fetchLeads = useCallback(async () => {
@@ -145,7 +149,11 @@ export default function CrmPage() {
       setLoading(true);
       setError(null);
       await Promise.all([fetchLeads(), fetchCalendar()]);
-    } catch (e) { setError(e instanceof Error ? e.message : "조회 중 오류"); }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "조회 중 오류";
+      setError(msg);
+      setToast({ message: msg, tone: "error" });
+    }
     finally { setLoading(false); }
   }, [fetchLeads, fetchCalendar]);
 
@@ -158,10 +166,17 @@ export default function CrmPage() {
       const res = await fetch(`/api/crm/leads/${id}/status`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ crmStatus: status, version }),
       });
-      if (res.ok) await refreshAll();
-      else if (res.status === 409) setError("다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요.");
-      else setError("상태 변경 실패");
-    } catch { setError("서버 통신 오류"); }
+      if (res.ok) {
+        setToast({ message: "상태가 변경되었습니다.", tone: "success" });
+        await refreshAll();
+      } else if (res.status === 409) {
+        setError("다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요.");
+        setToast({ message: "다른 상담원이 먼저 변경했습니다.", tone: "error" });
+      } else setError("상태 변경 실패");
+    } catch {
+      setError("서버 통신 오류");
+      setToast({ message: "서버 통신 오류", tone: "error" });
+    }
   };
 
   const updateAssignee = async (id: number, assigneeId: number | null) => {
@@ -170,9 +185,14 @@ export default function CrmPage() {
       const res = await fetch(`/api/crm/leads/${id}/assign`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assigneeId, version }),
       });
-      if (res.ok) await refreshAll();
-      else if (res.status === 409) setError("다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요.");
-    } catch { setError("할당 변경 실패"); }
+      if (res.ok) {
+        setToast({ message: "담당자가 변경되었습니다.", tone: "success" });
+        await refreshAll();
+      } else if (res.status === 409) {
+        setError("다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요.");
+        setToast({ message: "다른 상담원이 먼저 변경했습니다.", tone: "error" });
+      }
+    } catch { setError("할당 변경 실패"); setToast({ message: "할당 변경 실패", tone: "error" }); }
   };
 
   const updateSchedule = async (id: number, field: string, value: string) => {
@@ -181,9 +201,14 @@ export default function CrmPage() {
       const res = await fetch(`/api/crm/leads/${id}/schedule`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [field]: value ? new Date(value).toISOString() : null, version }),
       });
-      if (res.ok) await refreshAll();
-      else if (res.status === 409) setError("다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요.");
-    } catch { setError("일정 변경 실패"); }
+      if (res.ok) {
+        setToast({ message: "일정이 변경되었습니다.", tone: "success" });
+        await refreshAll();
+      } else if (res.status === 409) {
+        setError("다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요.");
+        setToast({ message: "다른 상담원이 먼저 변경했습니다.", tone: "error" });
+      }
+    } catch { setError("일정 변경 실패"); setToast({ message: "일정 변경 실패", tone: "error" }); }
   };
 
   const filteredLeads = useMemo(() => {
@@ -199,6 +224,11 @@ export default function CrmPage() {
   }, [filteredLeads]);
 
   const selectedLead = useMemo(() => leads.find(l => l.id === selectedLeadId) || null, [leads, selectedLeadId]);
+  const viewContainerRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      node.focus();
+    }
+  }, [viewMode]);
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden text-slate-900 font-[family-name:var(--font-sans)]">
@@ -222,9 +252,9 @@ export default function CrmPage() {
           <div className="flex items-center gap-6">
             <h1 className="text-xl font-bold">접수 현황</h1>
             <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
-              <button onClick={() => setViewMode("kanban")} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "kanban" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}><span className="material-icons text-sm">view_kanban</span> 칸반</button>
-              <button onClick={() => setViewMode("list")} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}><span className="material-icons text-sm">view_list</span> 리스트</button>
-              <button onClick={() => setViewMode("calendar")} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "calendar" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}><span className="material-icons text-sm">calendar_today</span> 캘린더</button>
+              <button onClick={() => setViewMode("kanban")} disabled={loading} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "kanban" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">view_kanban</span> 칸반</button>
+              <button onClick={() => setViewMode("list")} disabled={loading} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">view_list</span> 리스트</button>
+              <button onClick={() => setViewMode("calendar")} disabled={loading} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "calendar" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">calendar_today</span> 캘린더</button>
             </div>
             
             <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg shrink-0 ml-2">
@@ -248,16 +278,18 @@ export default function CrmPage() {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-hidden p-6 relative">
-          {viewMode === "kanban" && <KanbanView grouped={groupedLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} draggingId={draggingId} setDraggingId={setDraggingId} dragOverStatus={dragOverStatus} setDragOverStatus={setDragOverStatus} />}
-          {viewMode === "list" && <ListView leads={filteredLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} loading={loading} />}
-          {viewMode === "calendar" && <CalendarView events={calendarEvents} />}
+        <div className="flex-1 overflow-hidden p-6 relative" tabIndex={-1} ref={viewContainerRef}>
+          {loading && <SkeletonOverlay viewMode={viewMode} />}
+          {!loading && viewMode === "kanban" && <KanbanView grouped={groupedLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} draggingId={draggingId} setDraggingId={setDraggingId} dragOverStatus={dragOverStatus} setDragOverStatus={setDragOverStatus} />}
+          {!loading && viewMode === "list" && <ListView leads={filteredLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} loading={loading} />}
+          {!loading && viewMode === "calendar" && <CalendarView events={calendarEvents} />}
         </div>
       </main>
 
       <LeadDrawer lead={selectedLead} onClose={() => setSelectedLeadId(null)} users={users} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} />
       
       {error && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-2 rounded-full shadow-2xl z-50 flex items-center gap-2"><span className="material-icons">warning</span> {error} <button onClick={() => setError(null)}>✕</button></div>}
+      {toast && <Toast message={toast.message} tone={toast.tone} onClose={() => setToast(null)} onRetry={error ? refreshAll : undefined} />}
     </div>
   );
 }
@@ -305,7 +337,8 @@ function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, on
   const stop = (e: React.MouseEvent | React.ChangeEvent) => e.stopPropagation();
   return (
     <div className="h-full flex flex-col bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto relative">
+        {loading && <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-10 flex items-center justify-center"><span className="material-icons text-slate-400 animate-pulse">hourglass_empty</span></div>}
         <table className="w-full text-left text-sm border-collapse">
           <thead className="sticky top-0 bg-slate-50 border-b border-border z-10">
             <tr>
@@ -389,5 +422,36 @@ function LeadDrawer({ lead, onClose, users, onStatus, onAssignee, onSchedule }: 
         <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex gap-3 shrink-0"><button className="flex-1 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600">부재중 전송</button><button className="flex-1 py-2.5 bg-primary text-white rounded-lg text-sm font-medium shadow-lg shadow-primary/20">예약 하기</button></div>
       </aside>
     </>
+  );
+}
+
+function SkeletonOverlay({ viewMode }: { viewMode: ViewMode }) {
+  return (
+    <div className="absolute inset-0 z-10 bg-white/70 backdrop-blur-[1px] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-2 text-slate-500">
+        <span className="material-icons animate-spin">refresh</span>
+        <span className="text-xs font-medium">{viewMode === "kanban" ? "칸반 데이터를 불러오는 중" : viewMode === "list" ? "리스트 데이터를 불러오는 중" : "캘린더를 불러오는 중"}</span>
+      </div>
+    </div>
+  );
+}
+
+function Toast({ message, tone = "info", onClose, onRetry }: { message: string; tone?: "error" | "success" | "info"; onClose: () => void; onRetry?: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 3500);
+    return () => clearTimeout(t);
+  }, [onClose]);
+  const toneClasses = {
+    error: "bg-red-600 text-white",
+    success: "bg-emerald-600 text-white",
+    info: "bg-slate-800 text-white",
+  };
+  return (
+    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full shadow-2xl z-50 flex items-center gap-2 text-sm ${toneClasses[tone]}`}>
+      <span className="material-icons text-base">{tone === "error" ? "error" : tone === "success" ? "check_circle" : "info"}</span>
+      <span>{message}</span>
+      {onRetry && <button onClick={onRetry} className="underline text-xs">재시도</button>}
+      <button onClick={onClose} className="text-white/80 hover:text-white"><span className="material-icons text-sm">close</span></button>
+    </div>
   );
 }
