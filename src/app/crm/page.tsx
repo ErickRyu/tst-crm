@@ -100,6 +100,13 @@ function isOverdue(lead: Lead) {
   return { flag: over24, label: over24 ? "24h+" : "" };
 }
 
+function seniorLabel(lead: Lead) {
+  if (lead.isSenior65Plus) return "만 65세+";
+  if (lead.monthsUntil65 === null) return "";
+  if (lead.monthsUntil65 <= 0) return "만 65세 도달";
+  return `D-${lead.monthsUntil65}개월`;
+}
+
 const statusStyles: Record<CrmStatus, { tone: string; badge: string; border: string; dot: string }> = {
   신규인입: { tone: "bg-white", badge: "bg-red-50 text-red-600", border: "border-l-4 border-l-red-500", dot: "bg-red-500" },
   "1차부재": { tone: "bg-white", badge: "bg-amber-50 text-amber-700", border: "border border-slate-200", dot: "bg-amber-400" },
@@ -460,8 +467,8 @@ function KanbanView({ grouped, users, onSelect, selectedId, onStatus, draggingId
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1 mb-3">
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${l.careTag.includes("임플란트") ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-600"}`}>{l.careTag}</span>
-                  {l.isSenior65Plus && <span className="bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded text-[10px] font-bold">만 65세+</span>}
+                  <TagChip label={l.careTag} tone={l.careTag.includes("임플란트") ? "indigo" : "slate"} />
+                  {seniorLabel(l) && <TagChip label={seniorLabel(l)} tone="amber" />}
                 </div>
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50" onClick={e => e.stopPropagation()}>
                    <div className="flex items-center gap-1 text-[10px] text-slate-400">
@@ -499,7 +506,12 @@ function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, on
             {leads.map((l) => (
               <tr key={l.id} onClick={() => onSelect(l.id)} className={`hover:bg-slate-50 cursor-pointer transition-colors ${selectedId === l.id ? "bg-blue-50/50" : ""}`}>
                 <td className="px-6 py-3"><div className="flex items-center gap-2"><div><div className="font-bold text-slate-900">{l.name}</div><div className="text-[10px] text-slate-500">{l.phone}</div></div>{(() => { const { flag, label } = isOverdue(l); return flag ? <span className="bg-red-100 text-red-700 border border-red-200 px-1.5 py-0.5 rounded text-[10px] font-bold whitespace-nowrap">{label}</span> : null; })()}</div></td>
-                <td className="px-6 py-3"><div className="flex gap-1">{l.isSenior65Plus && <span className="bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded text-[10px] font-bold">만 65세+</span>}<span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-bold">{l.careTag}</span></div></td>
+                <td className="px-6 py-3">
+                  <div className="flex gap-1">
+                    <TagChip label={seniorLabel(l)} tone="amber" />
+                    <TagChip label={l.careTag} tone={l.careTag.includes("임플란트") ? "indigo" : "slate"} />
+                  </div>
+                </td>
                 <td className="px-6 py-3" onClick={stop}>
                   <select value={l.crmStatus} onChange={e => onStatus(l.id, e.target.value as CrmStatus)} className="text-[11px] font-bold border-slate-200 rounded px-2 py-1 bg-white focus:ring-1 focus:ring-primary">
                     {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
@@ -595,6 +607,10 @@ function LeadDrawer({ lead, loading, error, onRetry, onClose, users, onStatus, o
             <>
               <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-3">상태 변경</h4><div className="grid grid-cols-2 gap-2">{statusOptions.map(s => <button key={s} onClick={() => onStatus(lead.id, s)} className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all ${lead.crmStatus === s ? 'bg-primary/5 border-primary text-primary shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{s}</button>)}</div></section>
               <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">담당 상담원</h4><select value={lead.assigneeId || ""} onChange={e => onAssignee(lead.id, Number(e.target.value) || null)} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm">{users.map((u: User) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></section>
+              <section className="flex flex-wrap gap-1">
+                <TagChip label={lead.careTag} tone={lead.careTag.includes("임플란트") ? "indigo" : "slate"} />
+                <TagChip label={seniorLabel(lead)} tone="amber" />
+              </section>
               <section className="grid grid-cols-2 gap-4"><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">팔로업 일정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.followUpAt)} onBlur={e => onSchedule(lead.id, "followUpAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">예약 확정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onBlur={e => onSchedule(lead.id, "appointmentAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div></section>
               <section className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -652,4 +668,15 @@ function SkeletonOverlay({ viewMode }: { viewMode: ViewMode }) {
       </div>
     </div>
   );
+}
+
+
+function TagChip({ label, tone }: { label: string; tone: "indigo" | "slate" | "amber" }) {
+  if (!label) return null;
+  const classes = {
+    indigo: "bg-indigo-50 text-indigo-700",
+    slate: "bg-slate-100 text-slate-700",
+    amber: "bg-amber-50 text-amber-700",
+  }[tone];
+  return <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${classes}`}>{label}</span>;
 }
