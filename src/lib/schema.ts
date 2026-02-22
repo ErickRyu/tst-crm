@@ -57,3 +57,17 @@ export const leadMemos = pgTable(
     pk: primaryKey({ columns: [table.id] }),
   })
 );
+
+export const smsLogs = pgTable("sms_logs", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+  phone: text("phone").notNull(),
+  templateKey: text("template_key"),
+  body: text("body").notNull(),
+  msgType: text("msg_type").notNull(), // SMS, LMS
+  status: text("status").notNull(), // sent, failed, test
+  senderName: text("sender_name").notNull(),
+  msgId: text("msg_id"), // Aligo response msg_id
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

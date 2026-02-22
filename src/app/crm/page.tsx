@@ -63,6 +63,14 @@ interface LeadMemo {
   createdAt: string;
 }
 
+interface SmsTemplate {
+  key: string;
+  label: string;
+  icon: string;
+  body: string;
+  msgType: "SMS" | "LMS";
+}
+
 // Props Interfaces
 interface ViewProps {
   leads: Lead[];
@@ -75,7 +83,12 @@ interface ViewProps {
   loading?: boolean;
 }
 
-interface KanbanProps extends ViewProps {
+interface KanbanProps {
+  grouped: Record<CrmStatus, Lead[]>;
+  users: User[];
+  onSelect: (id: number) => void;
+  selectedId: number | null;
+  onStatus: (id: number, s: CrmStatus) => Promise<void>;
   draggingId: number | null;
   setDraggingId: (id: number | null) => void;
   dragOverStatus: CrmStatus | null;
@@ -148,6 +161,9 @@ function CrmShell() {
   const [memoSaving, setMemoSaving] = useState(false);
   const [editingMemoId, setEditingMemoId] = useState<number | null>(null);
   const [editingBody, setEditingBody] = useState("");
+  const [smsTemplates, setSmsTemplates] = useState<SmsTemplate[]>([]);
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsTestMode, setSmsTestMode] = useState(true);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<CrmStatus | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -211,7 +227,50 @@ function CrmShell() {
     }
   }, [fetchLeads, fetchCalendar, pushToast, startLoading, stopLoading]);
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  const fetchSmsTemplates = useCallback(async () => {
+    try {
+      const res = await fetch("/api/crm/sms/templates");
+      const json = await res.json();
+      setSmsTemplates((json.data || []) as SmsTemplate[]);
+      setSmsTestMode(json.meta?.testMode ?? true);
+    } catch {
+      /* templates are non-critical */
+    }
+  }, []);
+
+  const sendSms = async (leadId: number, msg: string, templateKey?: string) => {
+    if (!msg.trim()) {
+      pushToast("메시지 내용을 입력하세요.", "error");
+      return;
+    }
+    try {
+      setSmsSending(true);
+      const res = await fetch(`/api/crm/leads/${leadId}/sms`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          msg: msg.trim(),
+          templateKey,
+          senderName: currentUser,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "SMS 발송 실패");
+      pushToast(json.message, json.data?.testMode ? "info" : "success");
+      // 메모 새로고침 (system 메모가 추가되었으므로)
+      if (selectedLeadId) {
+        const memosRes = await fetch(`/api/crm/leads/${selectedLeadId}/memos`);
+        const memosJson = await memosRes.json();
+        if (memosRes.ok) setMemos(memosJson.data || []);
+      }
+    } catch (e) {
+      pushToast(e instanceof Error ? e.message : "SMS 발송 실패", "error");
+    } finally {
+      setSmsSending(false);
+    }
+  };
+
+  useEffect(() => { fetchUsers(); fetchSmsTemplates(); }, [fetchUsers, fetchSmsTemplates]);
   useEffect(() => { refreshAll(); }, [refreshAll]);
   // 30초 폴링으로 실시간성 보강
   useEffect(() => {
@@ -493,7 +552,7 @@ function CrmShell() {
         {/* Content Area */}
         <div className="flex-1 overflow-hidden p-6 relative" tabIndex={-1} ref={viewContainerRef}>
           {loading && <SkeletonOverlay viewMode={viewMode} />}
-          {!loading && viewMode === "kanban" && <KanbanView grouped={groupedLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} draggingId={draggingId} setDraggingId={setDraggingId} dragOverStatus={dragOverStatus} setDragOverStatus={setDragOverStatus} />}
+          {!loading && viewMode === "kanban" && <KanbanView grouped={groupedLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} draggingId={draggingId} setDraggingId={setDraggingId} dragOverStatus={dragOverStatus} setDragOverStatus={setDragOverStatus} />}
           {!loading && viewMode === "list" && <ListView leads={filteredLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} loading={loading} />}
           {!loading && viewMode === "calendar" && <CalendarView events={calendarEvents} />}
         </div>
@@ -523,6 +582,10 @@ function CrmShell() {
         editingBody={editingBody}
         onEditingBody={setEditingBody}
         onDeleteMemo={deleteMemo}
+        smsTemplates={smsTemplates}
+        smsSending={smsSending}
+        smsTestMode={smsTestMode}
+        onSendSms={(msg, templateKey) => selectedLeadId && sendSms(selectedLeadId, msg, templateKey)}
       />
       
       {error && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-2 rounded-full shadow-2xl z-50 flex items-center gap-2"><span className="material-icons">warning</span> {error} <button onClick={() => setError(null)}>✕</button></div>}
@@ -673,6 +736,10 @@ function LeadDrawer({
   editingBody,
   onEditingBody,
   onDeleteMemo,
+  smsTemplates,
+  smsSending,
+  smsTestMode,
+  onSendSms,
 }: {
   lead: Lead | null;
   loading?: boolean;
@@ -697,8 +764,15 @@ function LeadDrawer({
   editingBody: string;
   onEditingBody: (v: string) => void;
   onDeleteMemo: (m: LeadMemo) => void;
+  smsTemplates: SmsTemplate[];
+  smsSending: boolean;
+  smsTestMode: boolean;
+  onSendSms: (msg: string, templateKey?: string) => void;
 }) {
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const [smsMsg, setSmsMsg] = useState("");
+  const [smsWithMemo, setSmsWithMemo] = useState(false);
+  const [quickMenuOpen, setQuickMenuOpen] = useState(false);
 
   useEffect(() => {
     if (lead && closeBtnRef.current) {
@@ -706,30 +780,62 @@ function LeadDrawer({
     }
   }, [lead]);
 
+  // 리드 변경 시 SMS 입력 초기화
+  useEffect(() => {
+    setSmsMsg("");
+    setQuickMenuOpen(false);
+  }, [lead?.id]);
+
+  const handleSendSms = () => {
+    if (!smsMsg.trim()) return;
+    onSendSms(smsMsg.trim());
+    // SMS와 동시에 메모 저장
+    if (smsWithMemo && smsMsg.trim()) {
+      onMemoInput(`[SMS 발송] ${smsMsg.trim()}`);
+    }
+    setSmsMsg("");
+  };
+
+  const handleTemplateSelect = (tpl: SmsTemplate) => {
+    // %고객명% 치환 preview
+    const msg = lead ? tpl.body.replace(/%고객명%/g, lead.name) : tpl.body;
+    setSmsMsg(msg);
+    setQuickMenuOpen(false);
+  };
+
   if (!lead && !loading && !error) return null;
   return (
     <>
       <div className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm" onClick={onClose}></div>
       <aside className="fixed top-0 right-0 z-40 h-full w-[420px] bg-white shadow-2xl flex flex-col translate-x-0 transition-transform">
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
+        {/* Header */}
+        <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-white shrink-0">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-primary font-bold text-xl">{lead?.name?.[0] || "?"}</div>
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center text-primary font-bold text-xl shrink-0">{lead?.name?.[0] || "?"}</div>
             <div>
-              <h2 className="font-bold text-lg">{lead?.name || (loading ? "불러오는 중..." : "데이터 없음")}</h2>
-              <div className="text-sm text-slate-500">{lead?.phone || ""}</div>
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-lg">{lead?.name || (loading ? "불러오는 중..." : "데이터 없음")}</h2>
+                {lead?.crmStatus && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${statusStyles[lead.crmStatus]?.badge || ""}`}>{lead.crmStatus}</span>}
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-500 mt-0.5">
+                <span className="material-icons text-[14px]">smartphone</span>
+                {lead?.phone || ""}
+              </div>
             </div>
           </div>
           <button ref={closeBtnRef} onClick={onClose} className="text-slate-400 hover:text-slate-600"><span className="material-icons">close</span></button>
         </div>
-        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto flex flex-col">
           {loading && (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2">
+            <div className="flex flex-col items-center justify-center flex-1 text-slate-400 gap-2">
               <span className="material-icons animate-spin">refresh</span>
               <span className="text-sm">상세 정보를 불러오는 중</span>
             </div>
           )}
           {!loading && error && (
-            <div className="flex flex-col items-center justify-center h-full text-slate-500 gap-3">
+            <div className="flex flex-col items-center justify-center flex-1 text-slate-500 gap-3">
               <span className="material-icons text-red-500 text-3xl">error</span>
               <div className="text-sm font-semibold">{error}</div>
               <div className="flex gap-2">
@@ -740,24 +846,107 @@ function LeadDrawer({
           )}
           {!loading && !error && lead && (
             <>
-              <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-3">상태 변경</h4><div className="grid grid-cols-2 gap-2">{statusOptions.map(s => <button key={s} onClick={() => onStatus(lead.id, s)} className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all ${lead.crmStatus === s ? 'bg-primary/5 border-primary text-primary shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{s}</button>)}</div></section>
-              <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">담당 상담원</h4><select value={lead.assigneeId || ""} onChange={e => onAssignee(lead.id, Number(e.target.value) || null)} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm">{users.map((u: User) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></section>
-              <section className="flex flex-wrap gap-1">
-                <TagChip label={lead.careTag} tone={lead.careTag.includes("임플란트") ? "indigo" : "slate"} />
-                <TagChip label={seniorLabel(lead)} tone="amber" />
-              </section>
-              <section className="grid grid-cols-2 gap-4"><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">팔로업 일정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.followUpAt)} onBlur={e => onSchedule(lead.id, "followUpAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">예약 확정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onBlur={e => onSchedule(lead.id, "appointmentAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div></section>
-              <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-[10px] font-bold text-slate-400 uppercase">직원 메모</h4>
-                  <span className={`text-[10px] ${memoInput.length > 1800 ? "text-red-500" : "text-slate-400"}`}>{memoInput.length}/2000</span>
+              {/* Status & Assignment */}
+              <div className="p-6 space-y-6">
+                <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-3">상태 변경</h4><div className="grid grid-cols-2 gap-2">{statusOptions.map(s => <button key={s} onClick={() => onStatus(lead.id, s)} className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all ${lead.crmStatus === s ? 'bg-primary/5 border-primary text-primary shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{s}</button>)}</div></section>
+                <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">담당 상담원</h4><select value={lead.assigneeId || ""} onChange={e => onAssignee(lead.id, Number(e.target.value) || null)} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm">{users.map((u: User) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></section>
+                <section className="flex flex-wrap gap-1">
+                  <TagChip label={lead.careTag} tone={lead.careTag.includes("임플란트") ? "indigo" : "slate"} />
+                  <TagChip label={seniorLabel(lead)} tone="amber" />
+                </section>
+                <section className="grid grid-cols-2 gap-4"><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">팔로업 일정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.followUpAt)} onBlur={e => onSchedule(lead.id, "followUpAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">예약 확정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onBlur={e => onSchedule(lead.id, "appointmentAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div></section>
+              </div>
+
+              {/* SMS Send Area */}
+              <div className="p-4 bg-white border-t border-slate-200">
+                <div className="relative">
+                  <textarea
+                    value={smsMsg}
+                    onChange={(e) => setSmsMsg(e.target.value)}
+                    maxLength={2000}
+                    rows={3}
+                    className="w-full bg-slate-50 border-none rounded-lg p-3 pr-12 text-sm text-slate-700 focus:ring-2 focus:ring-primary/20 resize-none placeholder-slate-400"
+                    placeholder="메시지를 입력하세요... (전송: Enter)"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendSms();
+                      }
+                    }}
+                  />
+                  <div className="absolute bottom-2 right-2 text-[10px] text-slate-400">
+                    {smsMsg.length > 0 && `${smsMsg.length}자`}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between mt-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setQuickMenuOpen(!quickMenuOpen)}
+                      className="text-xs flex items-center gap-1 px-2 py-1 bg-yellow-50 text-yellow-600 rounded border border-yellow-100 hover:bg-yellow-100 transition-colors"
+                    >
+                      <span className="material-icons text-[14px]">bolt</span> 빠른 답변
+                    </button>
+                    <div className="flex items-center gap-1 ml-2">
+                      <input
+                        type="checkbox"
+                        checked={smsWithMemo}
+                        onChange={(e) => setSmsWithMemo(e.target.checked)}
+                        id="sms-memo-sync"
+                        className="rounded border-slate-300 text-primary focus:ring-primary h-3 w-3"
+                      />
+                      <label htmlFor="sms-memo-sync" className="text-xs text-slate-500">SMS 동시 전송</label>
+                    </div>
+                    {smsTestMode && (
+                      <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">TEST</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleSendSms}
+                    disabled={smsSending || !smsMsg.trim()}
+                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm ${
+                      smsSending || !smsMsg.trim()
+                        ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                        : "bg-primary hover:bg-blue-700 text-white"
+                    }`}
+                  >
+                    {smsSending ? "발송 중..." : "전송"}
+                  </button>
+                </div>
+
+                {/* Quick Template Menu */}
+                {quickMenuOpen && (
+                  <div className="mt-2 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden">
+                    {smsTemplates.map((tpl) => (
+                      <button
+                        key={tpl.key}
+                        onClick={() => handleTemplateSelect(tpl)}
+                        className="w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 text-left transition-colors"
+                      >
+                        <span className="material-icons text-sm text-slate-400">{tpl.icon}</span>
+                        <span>{tpl.label}</span>
+                        <span className="ml-auto text-[10px] text-slate-400">{tpl.msgType}</span>
+                      </button>
+                    ))}
+                    {smsTemplates.length === 0 && (
+                      <div className="px-4 py-3 text-sm text-slate-400">템플릿이 없습니다.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Staff Memos */}
+              <div className="p-4 border-t border-slate-200 bg-slate-50">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="material-icons text-slate-400 text-sm">lock</span>
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">직원 메모 (내부용)</h4>
+                  <span className={`ml-auto text-[10px] ${memoInput.length > 1800 ? "text-red-500" : "text-slate-400"}`}>{memoInput.length}/2000</span>
                 </div>
                 <textarea
                   value={memoInput}
                   onChange={(e) => onMemoInput(e.target.value)}
                   maxLength={2000}
-                  rows={3}
-                  className="w-full border border-slate-200 rounded-lg p-3 text-sm resize-none focus:ring-primary/30 focus:outline-none"
+                  rows={2}
+                  className="w-full border border-slate-200 rounded-lg p-3 text-sm resize-none focus:ring-primary/30 focus:outline-none bg-white"
                   placeholder="통화 특이사항을 기록하세요."
                   onKeyDown={(e) => {
                     if (e.ctrlKey && e.key === "Enter") {
@@ -766,24 +955,28 @@ function LeadDrawer({
                     }
                   }}
                 />
-                <div className="flex justify-end">
+                <div className="flex justify-end mt-2">
                   <button
                     onClick={onSaveMemo}
                     disabled={memoSaving}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium ${memoSaving ? "bg-slate-200 text-slate-500" : "bg-primary text-white shadow-sm"}`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium ${memoSaving ? "bg-slate-200 text-slate-500" : "bg-primary text-white shadow-sm"}`}
                   >
                     {memoSaving ? "저장 중..." : "메모 저장"}
                   </button>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 mt-3">
                   {memoLoading && <div className="text-sm text-slate-400">메모를 불러오는 중...</div>}
                   {!memoLoading && memos.map((m) => {
                     const isOwner = m.authorName === currentUser;
+                    const isSystem = m.authorName.startsWith("[시스템]");
                     const isEditing = editingMemoId === m.id;
                     return (
-                      <div key={m.id} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                      <div key={m.id} className={`border rounded-lg p-3 ${isSystem ? "bg-yellow-50 border-yellow-100" : "bg-white border-slate-200"}`}>
                         <div className="text-[11px] text-slate-500 flex justify-between">
-                          <span className="font-semibold text-slate-600">{m.authorName}</span>
+                          <span className={`font-semibold ${isSystem ? "text-yellow-700" : "text-slate-600"}`}>
+                            {isSystem && <span className="material-icons text-[11px] mr-0.5 align-middle">sms</span>}
+                            {m.authorName}
+                          </span>
                           <span title={new Date(m.createdAt).toLocaleString()}>{new Date(m.createdAt).toLocaleString()}</span>
                         </div>
                         {isEditing ? (
@@ -817,14 +1010,31 @@ function LeadDrawer({
                   })}
                   {!memoLoading && memos.length === 0 && <div className="text-sm text-slate-400">메모가 없습니다.</div>}
                 </div>
-              </section>
+              </div>
             </>
           )}
         </div>
-        <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex gap-3 shrink-0">
-          <button className="flex-1 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600" disabled>부재중 전송</button>
-          <button className="flex-1 py-2.5 bg-primary text-white rounded-lg text-sm font-medium shadow-lg shadow-primary/20" disabled>예약 하기</button>
-        </div>
+
+        {/* Footer Action Buttons */}
+        {lead && !loading && !error && (
+          <div className="p-4 bg-white border-t border-slate-200 grid grid-cols-2 gap-3 shrink-0">
+            <div className="relative group">
+              <button
+                onClick={() => setQuickMenuOpen(!quickMenuOpen)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-medium transition-colors"
+              >
+                <span className="material-icons text-[18px] text-primary">send</span> 빠른 메시지
+                <span className="material-icons text-[16px]">{quickMenuOpen ? "expand_less" : "expand_more"}</span>
+              </button>
+            </div>
+            <button
+              onClick={() => lead.appointmentAt ? undefined : onSchedule(lead.id, "appointmentAt", new Date().toISOString())}
+              className="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary text-white hover:bg-blue-700 text-sm font-medium transition-colors shadow-sm shadow-primary/20"
+            >
+              <span className="material-icons text-[18px]">event</span> 예약 하기
+            </button>
+          </div>
+        )}
       </aside>
     </>
   );
