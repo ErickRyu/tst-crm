@@ -705,7 +705,7 @@ function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, on
               <th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">태그 및 뱃지</th>
               <th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">상태 (인라인)</th>
               <th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">담당자 (인라인)</th>
-              <th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">일정</th>
+              <th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">예약 일정</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -734,7 +734,7 @@ function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, on
                 </td>
                 <td className="px-6 py-3" onClick={stop}>
                   <div className="flex gap-1 items-center">
-                    <input type="datetime-local" defaultValue={toIsoLocal(l.followUpAt)} onBlur={e => onSchedule(l.id, "followUpAt", e.target.value)} className="text-[10px] border-slate-200 rounded px-1.5 py-0.5" />
+                    <input type="datetime-local" defaultValue={toIsoLocal(l.appointmentAt)} onBlur={e => onSchedule(l.id, "appointmentAt", e.target.value)} className="text-[10px] border-slate-200 rounded px-1.5 py-0.5" />
                     <span className="material-icons text-[14px] text-slate-300">calendar_today</span>
                   </div>
                 </td>
@@ -940,7 +940,7 @@ function LeadDrawer({
                   <TagChip label={fmtCreatedAt(lead.createdAt)} tone="gray" />
                   <TagChip label={lead.careTag} tone={lead.careTag.includes("임플란트") ? "indigo" : "slate"} />
                 </section>
-                <section className="grid grid-cols-2 gap-4"><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">팔로업 일정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.followUpAt)} onBlur={e => onSchedule(lead.id, "followUpAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">예약 확정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onBlur={e => onSchedule(lead.id, "appointmentAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div></section>
+                <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">예약 확정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onBlur={e => onSchedule(lead.id, "appointmentAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></section>
               </div>
 
               {/* SMS Send Area */}
