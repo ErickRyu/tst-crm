@@ -92,6 +92,7 @@ interface KanbanProps {
   onSelect: (id: number) => void;
   selectedId: number | null;
   onStatus: (id: number, s: CrmStatus) => Promise<void>;
+  onSaveMemo: (leadId: number, body: string) => Promise<void>;
   draggingId: number | null;
   setDraggingId: (id: number | null) => void;
   dragOverStatus: CrmStatus | null;
@@ -470,6 +471,17 @@ function CrmShell() {
     return leads.filter(l => l.name.toLowerCase().includes(t) || l.phone.includes(t));
   }, [leads, searchTerm]);
 
+  const saveQuickMemo = async (leadId: number, body: string) => {
+    const res = await fetch(`/api/crm/leads/${leadId}/memos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ authorName: currentUser, body }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || "메모 저장 실패");
+    pushToast("메모가 저장되었습니다.", "success");
+  };
+
   const groupedLeads = useMemo(() => {
     const g: Record<CrmStatus, Lead[]> = { "신규인입": [], "1차부재": [], "2차부재": [], "3차부재": [], "노쇼": [], "응대중": [], "통화완료": [], "예약완료": [] };
     filteredLeads.forEach(l => g[l.crmStatus].push(l));
@@ -545,7 +557,7 @@ function CrmShell() {
         {/* Content Area */}
         <div className="flex-1 overflow-hidden p-6 relative" tabIndex={-1} ref={viewContainerRef}>
           {loading && <SkeletonOverlay viewMode={viewMode} />}
-          {!loading && viewMode === "kanban" && <KanbanView grouped={groupedLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} draggingId={draggingId} setDraggingId={setDraggingId} dragOverStatus={dragOverStatus} setDragOverStatus={setDragOverStatus} />}
+          {!loading && viewMode === "kanban" && <KanbanView grouped={groupedLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onSaveMemo={saveQuickMemo} draggingId={draggingId} setDraggingId={setDraggingId} dragOverStatus={dragOverStatus} setDragOverStatus={setDragOverStatus} />}
           {!loading && viewMode === "list" && <ListView leads={filteredLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} loading={loading} />}
           {!loading && viewMode === "calendar" && <CalendarView events={calendarEvents} />}
         </div>
@@ -587,7 +599,7 @@ function CrmShell() {
   );
 }
 
-function KanbanView({ grouped, users, onSelect, selectedId, onStatus, draggingId, setDraggingId, dragOverStatus, setDragOverStatus }: KanbanProps) {
+function KanbanView({ grouped, users, onSelect, selectedId, onStatus, onSaveMemo, draggingId, setDraggingId, dragOverStatus, setDragOverStatus }: KanbanProps) {
   return (
     <div className="flex gap-4 h-full overflow-x-auto pb-4 items-start">
       {statusOptions.map(status => (
@@ -599,31 +611,106 @@ function KanbanView({ grouped, users, onSelect, selectedId, onStatus, draggingId
           </div>
           <div className="flex-1 overflow-y-auto px-3 space-y-3 pb-4">
             {grouped[status].map((l) => (
-              <div key={l.id} draggable onDragStart={() => setDraggingId(l.id)} onDragEnd={() => setDraggingId(null)} onClick={() => onSelect(l.id)}
-                className={`p-4 rounded-xl shadow-sm border bg-white cursor-grab transition-all hover:shadow-md ${statusStyles[l.crmStatus].border} ${selectedId === l.id ? "ring-2 ring-primary" : ""} ${draggingId === l.id ? "opacity-40" : ""}`}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <div><div className="font-bold text-sm">{l.name}</div><PhoneLink phone={l.phone} className="text-[10px] text-slate-500" /></div>
-                </div>
-                <div className="flex flex-wrap gap-1 mb-3">
-                  {l.age != null && <TagChip label={`${l.age}세`} tone="blue" />}
-                  {l.gender && <TagChip label={l.gender === "남" ? "남" : "여"} tone={l.gender === "남" ? "blue" : "pink"} />}
-                  {l.media && <TagChip label={l.media} tone="purple" />}
-                  <TagChip label={fmtCreatedAt(l.createdAt)} tone="gray" />
-                  <TagChip label={l.careTag} tone={l.careTag.includes("임플란트") ? "indigo" : "slate"} />
-                </div>
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50" onClick={e => e.stopPropagation()}>
-                   <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                     <span className="material-icons text-[12px]">person</span>
-                     {users.find(u => u.id === l.assigneeId)?.name || "미할당"}
-                   </div>
-                   <div className="text-[10px] text-slate-400">{l.lastCallAt ? new Date(l.lastCallAt).toLocaleDateString() : ""}</div>
-                </div>
-              </div>
+              <KanbanCard key={l.id} lead={l} users={users} selectedId={selectedId} draggingId={draggingId} onSelect={onSelect} onSaveMemo={onSaveMemo} setDraggingId={setDraggingId} />
             ))}
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMemo, setDraggingId }: {
+  lead: Lead; users: User[]; selectedId: number | null; draggingId: number | null;
+  onSelect: (id: number) => void; onSaveMemo: (leadId: number, body: string) => Promise<void>;
+  setDraggingId: (id: number | null) => void;
+}) {
+  const [memoOpen, setMemoOpen] = useState(false);
+  const [memoText, setMemoText] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [washing, setWashing] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const handleSave = async () => {
+    if (!memoText.trim()) return;
+    try {
+      setSaving(true);
+      await onSaveMemo(l.id, memoText.trim());
+      setMemoText("");
+      setMemoOpen(false);
+    } catch { /* toast handled upstream */ }
+    finally { setSaving(false); }
+  };
+
+  const handleWash = async () => {
+    if (!memoText.trim()) return;
+    try {
+      setWashing(true);
+      const res = await fetch("/api/crm/memos/wash", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ raw: memoText.trim(), patientName: l.name, phone: l.phone }),
+      });
+      const json = await res.json();
+      if (res.ok && json.data?.washed) setMemoText(json.data.washed);
+    } catch { /* silent */ }
+    finally { setWashing(false); }
+  };
+
+  return (
+    <div draggable onDragStart={() => setDraggingId(l.id)} onDragEnd={() => setDraggingId(null)} onClick={() => onSelect(l.id)}
+      className={`p-4 rounded-xl shadow-sm border bg-white cursor-grab transition-all hover:shadow-md ${statusStyles[l.crmStatus].border} ${selectedId === l.id ? "ring-2 ring-primary" : ""} ${draggingId === l.id ? "opacity-40" : ""}`}
+    >
+      <div className="flex justify-between items-start mb-2">
+        <div><div className="font-bold text-sm">{l.name}</div><PhoneLink phone={l.phone} className="text-[10px] text-slate-500" /></div>
+      </div>
+      <div className="flex flex-wrap gap-1 mb-3">
+        {l.age != null && <TagChip label={`${l.age}세`} tone="blue" />}
+        {l.gender && <TagChip label={l.gender === "남" ? "남" : "여"} tone={l.gender === "남" ? "blue" : "pink"} />}
+        {l.media && <TagChip label={l.media} tone="purple" />}
+        <TagChip label={fmtCreatedAt(l.createdAt)} tone="gray" />
+        <TagChip label={l.careTag} tone={l.careTag.includes("임플란트") ? "indigo" : "slate"} />
+      </div>
+
+      {/* Inline memo */}
+      <div className="mt-2 pt-2 border-t border-slate-50" onClick={e => e.stopPropagation()}>
+        {!memoOpen ? (
+          <button onClick={() => { setMemoOpen(true); setTimeout(() => textareaRef.current?.focus(), 0); }}
+            className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-primary transition-colors w-full">
+            <span className="material-icons text-[12px]">edit_note</span> 메모 입력...
+          </button>
+        ) : (
+          <div className="space-y-1.5">
+            <textarea ref={textareaRef} value={memoText} onChange={e => setMemoText(e.target.value)}
+              rows={3} maxLength={2000} placeholder="메모를 입력하세요..."
+              className="w-full text-[11px] border border-slate-200 rounded-lg p-2 resize-none focus:ring-1 focus:ring-primary/30 focus:outline-none"
+              onKeyDown={e => { if (e.ctrlKey && e.key === "Enter") { e.preventDefault(); handleSave(); } if (e.key === "Escape") { setMemoOpen(false); setMemoText(""); } }}
+            />
+            <div className="flex items-center justify-between">
+              <button onClick={handleWash} disabled={washing || !memoText.trim()}
+                className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 hover:bg-violet-100 disabled:opacity-40 transition-colors"
+                title="자연어를 구조화 템플릿으로 변환">
+                <span className="material-icons text-[11px]">auto_fix_high</span> {washing ? "변환중..." : "워싱"}
+              </button>
+              <div className="flex gap-1">
+                <button onClick={() => { setMemoOpen(false); setMemoText(""); }} className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-500">취소</button>
+                <button onClick={handleSave} disabled={saving || !memoText.trim()}
+                  className="text-[10px] px-2 py-0.5 rounded bg-primary text-white disabled:opacity-40">
+                  {saving ? "저장..." : "저장"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50" onClick={e => e.stopPropagation()}>
+         <div className="flex items-center gap-1 text-[10px] text-slate-400">
+           <span className="material-icons text-[12px]">person</span>
+           {users.find(u => u.id === l.assigneeId)?.name || "미할당"}
+         </div>
+         <div className="text-[10px] text-slate-400">{l.lastCallAt ? new Date(l.lastCallAt).toLocaleDateString() : ""}</div>
+      </div>
     </div>
   );
 }
