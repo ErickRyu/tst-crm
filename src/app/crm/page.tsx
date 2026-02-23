@@ -588,42 +588,74 @@ function CrmShell() {
 }
 
 function KanbanView({ grouped, users, onSelect, selectedId, onStatus, draggingId, setDraggingId, dragOverStatus, setDragOverStatus }: KanbanProps) {
+  const [showEmpty, setShowEmpty] = useState(false);
+  const emptyCount = statusOptions.filter(s => grouped[s].length === 0).length;
+
   return (
-    <div className="flex gap-4 h-full overflow-x-auto pb-4 items-start">
-      {statusOptions.map(status => (
-        <div key={status} onDragOver={(e) => { e.preventDefault(); setDragOverStatus(status); }} onDragLeave={() => setDragOverStatus(null)} onDrop={() => { if (!draggingId) return; setDragOverStatus(null); onStatus(draggingId, status); setDraggingId(null); }}
-          className={`w-80 shrink-0 flex flex-col max-h-full rounded-xl border border-border bg-slate-100/40 transition-colors ${dragOverStatus === status ? "bg-primary/5 border-primary/40" : ""}`}
-        >
-          <div className="p-4 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${statusStyles[status].dot}`}></span><span className="font-bold text-sm text-slate-700">{status}</span><span className="bg-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm">{grouped[status].length}</span></div>
-          </div>
-          <div className="flex-1 overflow-y-auto px-3 space-y-3 pb-4">
-            {grouped[status].map((l) => (
-              <div key={l.id} draggable onDragStart={() => setDraggingId(l.id)} onDragEnd={() => setDraggingId(null)} onClick={() => onSelect(l.id)}
-                className={`p-4 rounded-xl shadow-sm border bg-white cursor-grab transition-all hover:shadow-md ${statusStyles[l.crmStatus].border} ${selectedId === l.id ? "ring-2 ring-primary" : ""} ${draggingId === l.id ? "opacity-40" : ""}`}
+    <div className="flex flex-col h-full gap-2">
+      {emptyCount > 0 && (
+        <div className="flex items-center shrink-0">
+          <button onClick={() => setShowEmpty(!showEmpty)} className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-primary transition-colors px-1 py-0.5 rounded">
+            <span className="material-icons text-[14px]">{showEmpty ? "visibility_off" : "visibility"}</span>
+            {showEmpty ? "빈 컬럼 숨기기" : `빈 컬럼 ${emptyCount}개 표시`}
+          </button>
+        </div>
+      )}
+      <div className="flex gap-4 flex-1 overflow-x-auto pb-4 items-start">
+        {statusOptions.map(status => {
+          const isEmpty = grouped[status].length === 0;
+          const isDragTarget = dragOverStatus === status;
+
+          if (isEmpty && !showEmpty && !isDragTarget) {
+            return (
+              <div key={status} onDragOver={(e) => { e.preventDefault(); setDragOverStatus(status); }} onDragLeave={() => setDragOverStatus(null)} onDrop={() => { if (!draggingId) return; setDragOverStatus(null); onStatus(draggingId, status); setDraggingId(null); }}
+                className="w-12 shrink-0 flex flex-col items-center max-h-full rounded-xl border border-dashed border-slate-200 bg-slate-50/50 transition-colors hover:border-slate-300"
               >
-                <div className="flex justify-between items-start mb-2">
-                  <div><div className="font-bold text-sm">{l.name}</div><PhoneLink phone={l.phone} className="text-[10px] text-slate-500" /></div>
-                </div>
-                <div className="flex flex-wrap gap-1 mb-3">
-                  {l.age != null && <TagChip label={`${l.age}세`} tone="blue" />}
-                  {l.gender && <TagChip label={l.gender === "남" ? "남" : "여"} tone={l.gender === "남" ? "blue" : "pink"} />}
-                  {l.media && <TagChip label={l.media} tone="purple" />}
-                  <TagChip label={fmtCreatedAt(l.createdAt)} tone="gray" />
-                  <TagChip label={l.careTag} tone={l.careTag.includes("임플란트") ? "indigo" : "slate"} />
-                </div>
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50" onClick={e => e.stopPropagation()}>
-                   <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                     <span className="material-icons text-[12px]">person</span>
-                     {users.find(u => u.id === l.assigneeId)?.name || "미할당"}
-                   </div>
-                   <div className="text-[10px] text-slate-400">{l.lastCallAt ? new Date(l.lastCallAt).toLocaleDateString() : ""}</div>
+                <div className="py-4 flex flex-col items-center gap-1">
+                  <span className={`w-2 h-2 rounded-full ${statusStyles[status].dot}`}></span>
+                  <span className="text-[10px] font-bold text-slate-400 [writing-mode:vertical-lr]">{status}</span>
+                  <span className="text-[9px] text-slate-300 mt-1">0</span>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      ))}
+            );
+          }
+
+          return (
+            <div key={status} onDragOver={(e) => { e.preventDefault(); setDragOverStatus(status); }} onDragLeave={() => setDragOverStatus(null)} onDrop={() => { if (!draggingId) return; setDragOverStatus(null); onStatus(draggingId, status); setDraggingId(null); }}
+              className={`w-80 shrink-0 flex flex-col max-h-full rounded-xl border border-border bg-slate-100/40 transition-colors ${isDragTarget ? "bg-primary/5 border-primary/40" : ""}`}
+            >
+              <div className="p-4 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${statusStyles[status].dot}`}></span><span className="font-bold text-sm text-slate-700">{status}</span><span className="bg-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm">{grouped[status].length}</span></div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-3 space-y-3 pb-4">
+                {grouped[status].map((l) => (
+                  <div key={l.id} draggable onDragStart={() => setDraggingId(l.id)} onDragEnd={() => setDraggingId(null)} onClick={() => onSelect(l.id)}
+                    className={`p-4 rounded-xl shadow-sm border bg-white cursor-grab transition-all hover:shadow-md ${statusStyles[l.crmStatus].border} ${selectedId === l.id ? "ring-2 ring-primary" : ""} ${draggingId === l.id ? "opacity-40" : ""}`}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div><div className="font-bold text-sm">{l.name}</div><PhoneLink phone={l.phone} className="text-[10px] text-slate-500" /></div>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {l.age != null && <TagChip label={`${l.age}세`} tone="blue" />}
+                      {l.gender && <TagChip label={l.gender === "남" ? "남" : "여"} tone={l.gender === "남" ? "blue" : "pink"} />}
+                      {l.media && <TagChip label={l.media} tone="purple" />}
+                      <TagChip label={fmtCreatedAt(l.createdAt)} tone="gray" />
+                      <TagChip label={l.careTag} tone={l.careTag.includes("임플란트") ? "indigo" : "slate"} />
+                    </div>
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50" onClick={e => e.stopPropagation()}>
+                       <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                         <span className="material-icons text-[12px]">person</span>
+                         {users.find(u => u.id === l.assigneeId)?.name || "미할당"}
+                       </div>
+                       <div className="text-[10px] text-slate-400">{l.lastCallAt ? new Date(l.lastCallAt).toLocaleDateString() : ""}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
