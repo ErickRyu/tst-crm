@@ -72,6 +72,7 @@ interface SmsTemplate {
   icon: string;
   body: string;
   msgType: "SMS" | "LMS";
+  statuses?: string[];
 }
 
 // Props Interfaces
@@ -1000,24 +1001,43 @@ function LeadDrawer({
                 </div>
 
                 {/* Quick Template Menu */}
-                {quickMenuOpen && (
-                  <div className="mt-2 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden">
-                    {smsTemplates.map((tpl) => (
-                      <button
-                        key={tpl.key}
-                        onClick={() => handleTemplateSelect(tpl)}
-                        className="w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 text-left transition-colors"
-                      >
-                        <span className="material-icons text-sm text-slate-400">{tpl.icon}</span>
-                        <span>{tpl.label}</span>
-                        <span className="ml-auto text-[10px] text-slate-400">{tpl.msgType}</span>
-                      </button>
-                    ))}
-                    {smsTemplates.length === 0 && (
-                      <div className="px-4 py-3 text-sm text-slate-400">템플릿이 없습니다.</div>
-                    )}
-                  </div>
-                )}
+                {quickMenuOpen && (() => {
+                  const recommended = smsTemplates.filter(t => t.statuses?.includes(lead.crmStatus));
+                  const others = smsTemplates.filter(t => !t.statuses?.includes(lead.crmStatus));
+                  return (
+                    <div className="mt-2 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden max-h-64 overflow-y-auto">
+                      {recommended.length > 0 && (
+                        <>
+                          <div className="px-4 py-1.5 bg-primary/5 text-[10px] font-bold text-primary uppercase tracking-wider">추천 ({lead.crmStatus})</div>
+                          {recommended.map((tpl) => (
+                            <button key={tpl.key} onClick={() => handleTemplateSelect(tpl)}
+                              className="w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-primary/5 flex items-center gap-2 text-left transition-colors border-l-2 border-l-primary">
+                              <span className="material-icons text-sm text-primary">{tpl.icon}</span>
+                              <span className="font-medium">{tpl.label}</span>
+                              <span className="ml-auto text-[10px] text-slate-400">{tpl.msgType}</span>
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      {others.length > 0 && (
+                        <>
+                          {recommended.length > 0 && <div className="px-4 py-1.5 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider">전체</div>}
+                          {others.map((tpl) => (
+                            <button key={tpl.key} onClick={() => handleTemplateSelect(tpl)}
+                              className="w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 text-left transition-colors">
+                              <span className="material-icons text-sm text-slate-400">{tpl.icon}</span>
+                              <span>{tpl.label}</span>
+                              <span className="ml-auto text-[10px] text-slate-400">{tpl.msgType}</span>
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      {smsTemplates.length === 0 && (
+                        <div className="px-4 py-3 text-sm text-slate-400">템플릿이 없습니다.</div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Staff Memos */}
