@@ -923,7 +923,15 @@ function LeadDrawer({
             <>
               {/* Status & Assignment */}
               <div className="p-6 space-y-6">
-                <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-3">상태 변경</h4><div className="grid grid-cols-2 gap-2">{statusOptions.map(s => <button key={s} onClick={() => onStatus(lead.id, s)} className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all ${lead.crmStatus === s ? 'bg-primary/5 border-primary text-primary shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{s}</button>)}</div></section>
+                <section>
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">상태 변경</h4>
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${statusStyles[lead.crmStatus].dot}`}></span>
+                    <select value={lead.crmStatus} onChange={e => onStatus(lead.id, e.target.value as CrmStatus)} className={`flex-1 border border-slate-200 rounded-lg p-2.5 text-sm font-medium focus:ring-1 focus:ring-primary ${statusStyles[lead.crmStatus].badge}`}>
+                      {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </section>
                 <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">담당 상담원</h4><select value={lead.assigneeId || ""} onChange={e => onAssignee(lead.id, Number(e.target.value) || null)} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm">{users.map((u: User) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></section>
                 <section className="flex flex-wrap gap-1">
                   {lead.age != null && <TagChip label={`${lead.age}세`} tone="blue" />}
