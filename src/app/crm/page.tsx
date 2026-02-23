@@ -603,7 +603,7 @@ function KanbanView({ grouped, users, onSelect, selectedId, onStatus, draggingId
                 className={`p-4 rounded-xl shadow-sm border bg-white cursor-grab transition-all hover:shadow-md ${statusStyles[l.crmStatus].border} ${selectedId === l.id ? "ring-2 ring-primary" : ""} ${draggingId === l.id ? "opacity-40" : ""}`}
               >
                 <div className="flex justify-between items-start mb-2">
-                  <div><div className="font-bold text-sm">{l.name}</div><div className="text-[10px] text-slate-500">{l.phone}</div></div>
+                  <div><div className="font-bold text-sm">{l.name}</div><PhoneLink phone={l.phone} className="text-[10px] text-slate-500" /></div>
                 </div>
                 <div className="flex flex-wrap gap-1 mb-3">
                   {l.age != null && <TagChip label={`${l.age}세`} tone="blue" />}
@@ -647,7 +647,7 @@ function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, on
           <tbody className="divide-y divide-slate-100">
             {leads.map((l) => (
               <tr key={l.id} onClick={() => onSelect(l.id)} className={`hover:bg-slate-50 cursor-pointer transition-colors ${selectedId === l.id ? "bg-blue-50/50" : ""}`}>
-                <td className="px-6 py-3"><div className="flex items-center gap-2"><div><div className="font-bold text-slate-900">{l.name}</div><div className="text-[10px] text-slate-500">{l.phone}</div></div></div></td>
+                <td className="px-6 py-3"><div className="flex items-center gap-2"><div><div className="font-bold text-slate-900">{l.name}</div><PhoneLink phone={l.phone} className="text-[10px] text-slate-500" /></div></div></td>
                 <td className="px-6 py-3">
                   <div className="flex gap-1 flex-wrap">
                     {l.age != null && <TagChip label={`${l.age}세`} tone="blue" />}
@@ -814,7 +814,7 @@ function LeadDrawer({
               </div>
               <div className="flex items-center gap-2 text-sm text-slate-500 mt-0.5">
                 <span className="material-icons text-[14px]">smartphone</span>
-                {lead?.phone || ""}
+                {lead?.phone ? <PhoneLink phone={lead.phone} /> : ""}
               </div>
             </div>
           </div>
@@ -1049,6 +1049,27 @@ function SkeletonOverlay({ viewMode }: { viewMode: ViewMode }) {
   );
 }
 
+
+function PhoneLink({ phone, className = "" }: { phone: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    try {
+      await navigator.clipboard.writeText(phone);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* fallback: do nothing */ }
+  };
+  return (
+    <span className={`inline-flex items-center gap-1 ${className}`} onClick={e => e.stopPropagation()}>
+      <a href={`tel:${phone}`} className="hover:underline hover:text-primary transition-colors" title="전화 걸기">{phone}</a>
+      <button onClick={copy} className="text-slate-400 hover:text-primary transition-colors shrink-0" title="번호 복사" aria-label="전화번호 복사">
+        <span className="material-icons" style={{ fontSize: "12px" }}>{copied ? "check" : "content_copy"}</span>
+      </button>
+    </span>
+  );
+}
 
 function TagChip({ label, tone }: { label: string; tone: "indigo" | "slate" | "amber" | "blue" | "pink" | "purple" | "gray" }) {
   if (!label) return null;
