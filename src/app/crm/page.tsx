@@ -42,6 +42,9 @@ interface Lead {
   version: number;
   updatedAt: string;
   contactFailCount?: number;
+  age: number | null;
+  gender: string | null;
+  media: string;
 }
 
 interface CalendarEvent {
@@ -105,21 +108,11 @@ function toIsoLocal(datetime: string | null) {
   )}:${pad(d.getMinutes())}`;
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-function isOverdue(lead: Lead) {
-  if (lead.crmStatus === "노쇼") return { flag: true, label: "노쇼" };
-  const created = new Date(lead.createdAt).getTime();
-  if (Number.isNaN(created)) return { flag: false, label: "" };
-  const over24 = Date.now() - created >= DAY_MS;
-  return { flag: over24, label: over24 ? "24h+" : "" };
-}
-
-function seniorLabel(lead: Lead) {
-  if (lead.isSenior65Plus) return "만 65세+";
-  if (lead.monthsUntil65 === null) return "";
-  if (lead.monthsUntil65 <= 0) return "만 65세 도달";
-  return `D-${lead.monthsUntil65}개월`;
+function fmtCreatedAt(dt: string) {
+  const d = new Date(dt);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 const statusStyles: Record<CrmStatus, { tone: string; badge: string; border: string; dot: string }> = {
@@ -611,14 +604,13 @@ function KanbanView({ grouped, users, onSelect, selectedId, onStatus, draggingId
               >
                 <div className="flex justify-between items-start mb-2">
                   <div><div className="font-bold text-sm">{l.name}</div><div className="text-[10px] text-slate-500">{l.phone}</div></div>
-                  <div className="flex gap-1">
-                    {(() => { const { flag, label } = isOverdue(l); return flag ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">{label}</span> : null; })()}
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${statusStyles[l.crmStatus].badge}`}>{l.crmStatus}</span>
-                  </div>
                 </div>
                 <div className="flex flex-wrap gap-1 mb-3">
+                  {l.age != null && <TagChip label={`${l.age}세`} tone="blue" />}
+                  {l.gender && <TagChip label={l.gender === "남" ? "남" : "여"} tone={l.gender === "남" ? "blue" : "pink"} />}
+                  {l.media && <TagChip label={l.media} tone="purple" />}
+                  <TagChip label={fmtCreatedAt(l.createdAt)} tone="gray" />
                   <TagChip label={l.careTag} tone={l.careTag.includes("임플란트") ? "indigo" : "slate"} />
-                  {seniorLabel(l) && <TagChip label={seniorLabel(l)} tone="amber" />}
                 </div>
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50" onClick={e => e.stopPropagation()}>
                    <div className="flex items-center gap-1 text-[10px] text-slate-400">
@@ -655,10 +647,13 @@ function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, on
           <tbody className="divide-y divide-slate-100">
             {leads.map((l) => (
               <tr key={l.id} onClick={() => onSelect(l.id)} className={`hover:bg-slate-50 cursor-pointer transition-colors ${selectedId === l.id ? "bg-blue-50/50" : ""}`}>
-                <td className="px-6 py-3"><div className="flex items-center gap-2"><div><div className="font-bold text-slate-900">{l.name}</div><div className="text-[10px] text-slate-500">{l.phone}</div></div>{(() => { const { flag, label } = isOverdue(l); return flag ? <span className="bg-red-100 text-red-700 border border-red-200 px-1.5 py-0.5 rounded text-[10px] font-bold whitespace-nowrap">{label}</span> : null; })()}</div></td>
+                <td className="px-6 py-3"><div className="flex items-center gap-2"><div><div className="font-bold text-slate-900">{l.name}</div><div className="text-[10px] text-slate-500">{l.phone}</div></div></div></td>
                 <td className="px-6 py-3">
-                  <div className="flex gap-1">
-                    <TagChip label={seniorLabel(l)} tone="amber" />
+                  <div className="flex gap-1 flex-wrap">
+                    {l.age != null && <TagChip label={`${l.age}세`} tone="blue" />}
+                    {l.gender && <TagChip label={l.gender === "남" ? "남" : "여"} tone={l.gender === "남" ? "blue" : "pink"} />}
+                    {l.media && <TagChip label={l.media} tone="purple" />}
+                    <TagChip label={fmtCreatedAt(l.createdAt)} tone="gray" />
                     <TagChip label={l.careTag} tone={l.careTag.includes("임플란트") ? "indigo" : "slate"} />
                   </div>
                 </td>
@@ -851,8 +846,11 @@ function LeadDrawer({
                 <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-3">상태 변경</h4><div className="grid grid-cols-2 gap-2">{statusOptions.map(s => <button key={s} onClick={() => onStatus(lead.id, s)} className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all ${lead.crmStatus === s ? 'bg-primary/5 border-primary text-primary shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{s}</button>)}</div></section>
                 <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">담당 상담원</h4><select value={lead.assigneeId || ""} onChange={e => onAssignee(lead.id, Number(e.target.value) || null)} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm">{users.map((u: User) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></section>
                 <section className="flex flex-wrap gap-1">
+                  {lead.age != null && <TagChip label={`${lead.age}세`} tone="blue" />}
+                  {lead.gender && <TagChip label={lead.gender === "남" ? "남" : "여"} tone={lead.gender === "남" ? "blue" : "pink"} />}
+                  {lead.media && <TagChip label={lead.media} tone="purple" />}
+                  <TagChip label={fmtCreatedAt(lead.createdAt)} tone="gray" />
                   <TagChip label={lead.careTag} tone={lead.careTag.includes("임플란트") ? "indigo" : "slate"} />
-                  <TagChip label={seniorLabel(lead)} tone="amber" />
                 </section>
                 <section className="grid grid-cols-2 gap-4"><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">팔로업 일정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.followUpAt)} onBlur={e => onSchedule(lead.id, "followUpAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div><div><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">예약 확정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onBlur={e => onSchedule(lead.id, "appointmentAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></div></section>
               </div>
@@ -1052,12 +1050,16 @@ function SkeletonOverlay({ viewMode }: { viewMode: ViewMode }) {
 }
 
 
-function TagChip({ label, tone }: { label: string; tone: "indigo" | "slate" | "amber" }) {
+function TagChip({ label, tone }: { label: string; tone: "indigo" | "slate" | "amber" | "blue" | "pink" | "purple" | "gray" }) {
   if (!label) return null;
   const classes = {
     indigo: "bg-indigo-50 text-indigo-700",
     slate: "bg-slate-100 text-slate-700",
     amber: "bg-amber-50 text-amber-700",
+    blue: "bg-blue-50 text-blue-700",
+    pink: "bg-pink-50 text-pink-700",
+    purple: "bg-purple-50 text-purple-700",
+    gray: "bg-slate-50 text-slate-500",
   }[tone];
   return <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${classes}`} title={label} aria-label={label}>{label}</span>;
 }
@@ -1065,8 +1067,10 @@ function TagChip({ label, tone }: { label: string; tone: "indigo" | "slate" | "a
 function Legend() {
   return (
     <div className="flex items-center gap-2 text-[11px] text-slate-500">
-      <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-indigo-100 border border-indigo-200"></span>특화 진료</span>
-      <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-100 border border-amber-200"></span>연령 뱃지</span>
+      <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-100 border border-blue-200"></span>나이/성별</span>
+      <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-purple-100 border border-purple-200"></span>유입채널</span>
+      <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-slate-100 border border-slate-200"></span>유입일시</span>
+      <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-indigo-100 border border-indigo-200"></span>특화진료</span>
     </div>
   );
 }
