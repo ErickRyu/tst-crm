@@ -628,7 +628,6 @@ function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMe
   const [memoOpen, setMemoOpen] = useState(false);
   const [memoText, setMemoText] = useState("");
   const [saving, setSaving] = useState(false);
-  const [washing, setWashing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const handleSave = async () => {
@@ -640,21 +639,6 @@ function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMe
       setMemoOpen(false);
     } catch { /* toast handled upstream */ }
     finally { setSaving(false); }
-  };
-
-  const handleWash = async () => {
-    if (!memoText.trim()) return;
-    try {
-      setWashing(true);
-      const res = await fetch("/api/crm/memos/wash", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ raw: memoText.trim(), patientName: l.name, phone: l.phone }),
-      });
-      const json = await res.json();
-      if (res.ok && json.data?.washed) setMemoText(json.data.washed);
-    } catch { /* silent */ }
-    finally { setWashing(false); }
   };
 
   return (
@@ -686,19 +670,12 @@ function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMe
               className="w-full text-[11px] border border-slate-200 rounded-lg p-2 resize-none focus:ring-1 focus:ring-primary/30 focus:outline-none"
               onKeyDown={e => { if (e.ctrlKey && e.key === "Enter") { e.preventDefault(); handleSave(); } if (e.key === "Escape") { setMemoOpen(false); setMemoText(""); } }}
             />
-            <div className="flex items-center justify-between">
-              <button onClick={handleWash} disabled={washing || !memoText.trim()}
-                className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 hover:bg-violet-100 disabled:opacity-40 transition-colors"
-                title="자연어를 구조화 템플릿으로 변환">
-                <span className="material-icons text-[11px]">auto_fix_high</span> {washing ? "변환중..." : "워싱"}
+            <div className="flex items-center justify-end gap-1">
+              <button onClick={() => { setMemoOpen(false); setMemoText(""); }} className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-500">취소</button>
+              <button onClick={handleSave} disabled={saving || !memoText.trim()}
+                className="text-[10px] px-2 py-0.5 rounded bg-primary text-white disabled:opacity-40">
+                {saving ? "저장..." : "저장"}
               </button>
-              <div className="flex gap-1">
-                <button onClick={() => { setMemoOpen(false); setMemoText(""); }} className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-500">취소</button>
-                <button onClick={handleSave} disabled={saving || !memoText.trim()}
-                  className="text-[10px] px-2 py-0.5 rounded bg-primary text-white disabled:opacity-40">
-                  {saving ? "저장..." : "저장"}
-                </button>
-              </div>
             </div>
           </div>
         )}
@@ -855,6 +832,22 @@ function LeadDrawer({
   const [smsMsg, setSmsMsg] = useState("");
   const [smsWithMemo, setSmsWithMemo] = useState(false);
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
+  const [washing, setWashing] = useState(false);
+
+  const handleWash = async () => {
+    if (!memoInput.trim() || !lead) return;
+    try {
+      setWashing(true);
+      const res = await fetch("/api/crm/memos/wash", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ raw: memoInput.trim(), patientName: lead.name, phone: lead.phone }),
+      });
+      const json = await res.json();
+      if (res.ok && json.data?.washed) onMemoInput(json.data.washed);
+    } catch { /* silent */ }
+    finally { setWashing(false); }
+  };
 
   useEffect(() => {
     if (lead && closeBtnRef.current) {
@@ -1040,7 +1033,15 @@ function LeadDrawer({
                     }
                   }}
                 />
-                <div className="flex justify-end mt-2">
+                <div className="flex justify-between mt-2">
+                  <button
+                    onClick={handleWash}
+                    disabled={washing || !memoInput.trim()}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-violet-50 text-violet-600 hover:bg-violet-100 disabled:opacity-40 transition-colors"
+                    title="자연어를 구조화 템플릿으로 변환"
+                  >
+                    <span className="material-icons text-[13px]">auto_fix_high</span> {washing ? "변환중..." : "워싱"}
+                  </button>
                   <button
                     onClick={onSaveMemo}
                     disabled={memoSaving}
