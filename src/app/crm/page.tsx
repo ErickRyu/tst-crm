@@ -163,6 +163,7 @@ function CrmShell() {
   const [dragOverStatus, setDragOverStatus] = useState<CrmStatus | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [counselorOpen, setCounselorOpen] = useState(false);
+  const hasLoaded = useRef(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const { pushToast } = useToast();
   const { start: startLoading, stop: stopLoading } = useLoading();
@@ -207,11 +208,13 @@ function CrmShell() {
   }, [selectedUserId]);
 
   const refreshAll = useCallback(async () => {
-    const loadingId = startLoading("데이터를 불러오는 중");
+    const isInitial = !hasLoaded.current;
+    const loadingId = isInitial ? startLoading("데이터를 불러오는 중") : null;
     try {
-      setLoading(true);
+      if (isInitial) setLoading(true);
       setError(null);
       await Promise.all([fetchLeads(), fetchCalendar()]);
+      hasLoaded.current = true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : "조회 중 오류";
       setError(msg);
@@ -219,7 +222,7 @@ function CrmShell() {
     }
     finally {
       setLoading(false);
-      stopLoading(loadingId);
+      if (loadingId) stopLoading(loadingId);
     }
   }, [fetchLeads, fetchCalendar, pushToast, startLoading, stopLoading]);
 
@@ -577,10 +580,10 @@ function CrmShell() {
 
         {/* Content Area */}
         <div className="flex-1 overflow-hidden p-2 md:p-6 relative" tabIndex={-1} ref={viewContainerRef}>
-          {loading && <SkeletonOverlay viewMode={viewMode} />}
-          {!loading && viewMode === "kanban" && <KanbanView grouped={groupedLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onSaveMemo={saveQuickMemo} draggingId={draggingId} setDraggingId={setDraggingId} dragOverStatus={dragOverStatus} setDragOverStatus={setDragOverStatus} />}
-          {!loading && viewMode === "list" && <ListView leads={filteredLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} loading={loading} />}
-          {!loading && viewMode === "calendar" && <CalendarView events={calendarEvents} />}
+          {loading && !hasLoaded.current && <SkeletonOverlay viewMode={viewMode} />}
+          {(hasLoaded.current || !loading) && viewMode === "kanban" && <KanbanView grouped={groupedLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onSaveMemo={saveQuickMemo} draggingId={draggingId} setDraggingId={setDraggingId} dragOverStatus={dragOverStatus} setDragOverStatus={setDragOverStatus} />}
+          {(hasLoaded.current || !loading) && viewMode === "list" && <ListView leads={filteredLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} loading={loading} />}
+          {(hasLoaded.current || !loading) && viewMode === "calendar" && <CalendarView events={calendarEvents} />}
         </div>
       </main>
 
