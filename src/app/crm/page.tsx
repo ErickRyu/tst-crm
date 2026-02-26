@@ -648,13 +648,14 @@ function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMe
     >
       <div className="flex justify-between items-start mb-2">
         <div><div className="font-bold text-sm">{l.name}</div><PhoneLink phone={l.phone} className="text-[10px] text-slate-500" /></div>
+        <div className="text-[10px] text-slate-400 whitespace-nowrap">{fmtCreatedAt(l.createdAt)}</div>
       </div>
       <div className="flex flex-wrap gap-1 mb-3">
         {l.age != null && <TagChip label={`${l.age}세`} tone="blue" />}
         {l.gender && <TagChip label={l.gender === "남" ? "남" : "여"} tone={l.gender === "남" ? "blue" : "pink"} />}
         {l.media && <TagChip label={l.media} tone="purple" />}
-        <TagChip label={fmtCreatedAt(l.createdAt)} tone="gray" />
         <TagChip label={l.careTag} tone={l.careTag.includes("임플란트") ? "indigo" : "slate"} />
+        {l.appointmentAt && <TagChip label={`${new Date(l.appointmentAt).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })} 예약`} tone="green" />}
       </div>
 
       {/* Inline memo */}
@@ -682,11 +683,6 @@ function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMe
         )}
       </div>
 
-      {l.lastCallAt && (
-        <div className="flex items-center justify-end mt-2 pt-2 border-t border-slate-50">
-          <div className="text-[10px] text-slate-400">{new Date(l.lastCallAt).toLocaleDateString()}</div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1185,7 +1181,7 @@ function PhoneLink({ phone, className = "" }: { phone: string; className?: strin
   );
 }
 
-function TagChip({ label, tone }: { label: string; tone: "indigo" | "slate" | "amber" | "blue" | "pink" | "purple" | "gray" }) {
+function TagChip({ label, tone }: { label: string; tone: "indigo" | "slate" | "amber" | "blue" | "pink" | "purple" | "gray" | "green" }) {
   if (!label) return null;
   const classes = {
     indigo: "bg-indigo-50 text-indigo-700",
@@ -1195,6 +1191,7 @@ function TagChip({ label, tone }: { label: string; tone: "indigo" | "slate" | "a
     pink: "bg-pink-50 text-pink-700",
     purple: "bg-purple-50 text-purple-700",
     gray: "bg-slate-50 text-slate-500",
+    green: "bg-emerald-50 text-emerald-700",
   }[tone];
   return <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${classes}`} title={label} aria-label={label}>{label}</span>;
 }
