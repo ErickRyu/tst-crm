@@ -635,7 +635,7 @@ function KanbanView({ grouped, users, onSelect, selectedId, onStatus, onSaveMemo
           </div>
           <div className="flex-1 overflow-y-auto px-2 space-y-2 pb-3 md:px-3 md:space-y-3 md:pb-4">
             {grouped[status].map((l) => (
-              <KanbanCard key={l.id} lead={l} users={users} selectedId={selectedId} draggingId={draggingId} onSelect={onSelect} onSaveMemo={onSaveMemo} setDraggingId={setDraggingId} onStatus={onStatus} />
+              <KanbanCard key={l.id} lead={l} users={users} selectedId={selectedId} draggingId={draggingId} onSelect={onSelect} onSaveMemo={onSaveMemo} setDraggingId={setDraggingId} />
             ))}
           </div>
         </div>
@@ -644,11 +644,10 @@ function KanbanView({ grouped, users, onSelect, selectedId, onStatus, onSaveMemo
   );
 }
 
-function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMemo, setDraggingId, onStatus }: {
+function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMemo, setDraggingId }: {
   lead: Lead; users: User[]; selectedId: number | null; draggingId: number | null;
   onSelect: (id: number) => void; onSaveMemo: (leadId: number, body: string) => Promise<void>;
   setDraggingId: (id: number | null) => void;
-  onStatus: (id: number, s: CrmStatus) => Promise<void>;
 }) {
   const [memoOpen, setMemoOpen] = useState(false);
   const [memoText, setMemoText] = useState("");
@@ -681,13 +680,6 @@ function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMe
         <TagChip label={l.careTag} tone={l.careTag.includes("임플란트") ? "indigo" : "slate"} />
         {l.appointmentAt && <TagChip label={`${new Date(l.appointmentAt).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })} 예약`} tone="green" />}
       </div>
-      {/* Mobile status dropdown */}
-      <div className="mb-2 md:hidden" onClick={e => e.stopPropagation()}>
-        <select value={l.crmStatus} onChange={e => onStatus(l.id, e.target.value as CrmStatus)} className={`w-full text-[11px] font-bold border-slate-200 rounded px-2 py-1.5 bg-white focus:ring-1 focus:ring-primary ${statusStyles[l.crmStatus].badge}`}>
-          {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-      </div>
-
       {/* Inline memo */}
       <div className="mt-2 pt-2 border-t border-slate-50" onClick={e => e.stopPropagation()}>
         {!memoOpen ? (
