@@ -40,3 +40,8 @@ body {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+@media (max-width: 767px) {
+  .overflow-x-auto::-webkit-scrollbar { display: none; }
+  .overflow-x-auto { scrollbar-width: none; }
+}

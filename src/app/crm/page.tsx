@@ -507,7 +507,7 @@ function CrmShell() {
     <FeedbackProvider>
       <div className="flex h-screen w-full bg-background overflow-hidden text-slate-900 font-[family-name:var(--font-sans)]">
       {/* Sidebar */}
-      <aside className="w-16 flex flex-col items-center py-6 bg-card border-r border-border shrink-0">
+      <aside className="hidden md:flex w-16 flex-col items-center py-6 bg-card border-r border-border shrink-0">
         <div className="mb-8 w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-primary/30">D</div>
         <nav className="flex-1 flex flex-col gap-6 items-center w-full">
           <button className="p-3 bg-primary/10 text-primary rounded-xl"><span className="material-icons">dashboard</span></button>
@@ -525,38 +525,38 @@ function CrmShell() {
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="h-16 flex items-center justify-between px-6 bg-card border-b border-border shrink-0">
-          <div className="flex items-center gap-6">
-            <h1 className="text-xl font-bold">접수 현황</h1>
+        <header className="flex flex-col gap-2 px-3 py-2 md:h-16 md:flex-row md:items-center md:justify-between md:px-6 md:py-0 bg-card border-b border-border shrink-0">
+          <div className="flex items-center gap-2 flex-wrap md:gap-6 md:flex-nowrap">
+            <h1 className="text-base md:text-xl font-bold">접수 현황</h1>
             <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
-              <button aria-pressed={viewMode === "kanban"} onClick={() => setViewMode("kanban")} disabled={loading} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "kanban" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">view_kanban</span> 칸반</button>
-              <button aria-pressed={viewMode === "list"} onClick={() => setViewMode("list")} disabled={loading} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">view_list</span> 리스트</button>
-              <button aria-pressed={viewMode === "calendar"} onClick={() => setViewMode("calendar")} disabled={loading} className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "calendar" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">calendar_today</span> 캘린더</button>
+              <button aria-pressed={viewMode === "kanban"} onClick={() => setViewMode("kanban")} disabled={loading} className={`px-2 py-1 text-[10px] md:px-3 md:py-1.5 md:text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "kanban" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">view_kanban</span> 칸반</button>
+              <button aria-pressed={viewMode === "list"} onClick={() => setViewMode("list")} disabled={loading} className={`px-2 py-1 text-[10px] md:px-3 md:py-1.5 md:text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">view_list</span> 리스트</button>
+              <button aria-pressed={viewMode === "calendar"} onClick={() => setViewMode("calendar")} disabled={loading} className={`px-2 py-1 text-[10px] md:px-3 md:py-1.5 md:text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "calendar" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">calendar_today</span> 캘린더</button>
             </div>
             
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg shrink-0 ml-2">
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg shrink-0 ml-0 md:ml-2">
               <button onClick={() => { setScope("all"); setSelectedUserId(null); }} className={`px-3 py-1.5 text-[11px] font-bold rounded transition-all ${scope === "all" ? "bg-primary text-white" : "text-slate-500"}`}>전체보기</button>
               <button onClick={() => { setScope("mine"); if (users.length > 0 && !selectedUserId) setSelectedUserId(users[0].id); }} className={`px-3 py-1.5 text-[11px] font-bold rounded transition-all ${scope === "mine" ? "bg-primary text-white" : "text-slate-500"}`}>내 할당</button>
             </div>
 
-            <label className="flex items-center gap-2 cursor-pointer ml-4">
+            <label className="flex items-center gap-2 cursor-pointer ml-0 md:ml-4">
               <input type="checkbox" checked={includeDone} onChange={e => setIncludeDone(e.target.checked)} className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4" />
               <span className="text-[11px] font-bold text-slate-500">완료 항목 포함</span>
             </label>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="relative"><span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">search</span><input ref={searchInputRef} type="text" placeholder="환자명, 전화번호..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-64 bg-slate-100 border-none rounded-lg py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary/20" /></div>
+          <div className="flex items-center gap-2 w-full md:w-auto md:gap-4">
+            <div className="relative flex-1 md:flex-none"><span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">search</span><input ref={searchInputRef} type="text" placeholder="환자명, 전화번호..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-64 bg-slate-100 border-none rounded-lg py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary/20" /></div>
             <select value={selectedUserId || ""} onChange={(e) => { const v = e.target.value ? Number(e.target.value) : null; setSelectedUserId(v); if(v) setScope("mine"); }} className="bg-card border border-border rounded-lg px-3 py-2 text-sm font-medium">
               <option value="">전체 상담원</option>
               {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
-            <Legend />
+            <div className="hidden md:flex"><Legend /></div>
           </div>
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-hidden p-6 relative" tabIndex={-1} ref={viewContainerRef}>
+        <div className="flex-1 overflow-hidden p-2 md:p-6 relative" tabIndex={-1} ref={viewContainerRef}>
           {loading && <SkeletonOverlay viewMode={viewMode} />}
           {!loading && viewMode === "kanban" && <KanbanView grouped={groupedLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onSaveMemo={saveQuickMemo} draggingId={draggingId} setDraggingId={setDraggingId} dragOverStatus={dragOverStatus} setDragOverStatus={setDragOverStatus} />}
           {!loading && viewMode === "list" && <ListView leads={filteredLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} loading={loading} />}
@@ -602,17 +602,17 @@ function CrmShell() {
 
 function KanbanView({ grouped, users, onSelect, selectedId, onStatus, onSaveMemo, draggingId, setDraggingId, dragOverStatus, setDragOverStatus }: KanbanProps) {
   return (
-    <div className="flex gap-4 h-full overflow-x-auto pb-4 items-start">
+    <div className="flex gap-2 h-full overflow-x-auto pb-4 items-start snap-x snap-mandatory md:gap-4 md:snap-none">
       {statusOptions.map(status => (
         <div key={status} onDragOver={(e) => { e.preventDefault(); setDragOverStatus(status); }} onDragLeave={() => setDragOverStatus(null)} onDrop={() => { if (!draggingId) return; setDragOverStatus(null); onStatus(draggingId, status); setDraggingId(null); }}
-          className={`w-80 shrink-0 flex flex-col max-h-full rounded-xl border border-border bg-slate-100/40 transition-colors ${dragOverStatus === status ? "bg-primary/5 border-primary/40" : ""}`}
+          className={`w-72 shrink-0 snap-center md:w-80 flex flex-col max-h-full rounded-xl border border-border bg-slate-100/40 transition-colors ${dragOverStatus === status ? "bg-primary/5 border-primary/40" : ""}`}
         >
-          <div className="p-4 flex items-center justify-between shrink-0">
+          <div className="p-3 md:p-4 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${statusStyles[status].dot}`}></span><span className="font-bold text-sm text-slate-700">{status}</span><span className="bg-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm">{grouped[status].length}</span></div>
           </div>
-          <div className="flex-1 overflow-y-auto px-3 space-y-3 pb-4">
+          <div className="flex-1 overflow-y-auto px-2 space-y-2 pb-3 md:px-3 md:space-y-3 md:pb-4">
             {grouped[status].map((l) => (
-              <KanbanCard key={l.id} lead={l} users={users} selectedId={selectedId} draggingId={draggingId} onSelect={onSelect} onSaveMemo={onSaveMemo} setDraggingId={setDraggingId} />
+              <KanbanCard key={l.id} lead={l} users={users} selectedId={selectedId} draggingId={draggingId} onSelect={onSelect} onSaveMemo={onSaveMemo} setDraggingId={setDraggingId} onStatus={onStatus} />
             ))}
           </div>
         </div>
@@ -621,10 +621,11 @@ function KanbanView({ grouped, users, onSelect, selectedId, onStatus, onSaveMemo
   );
 }
 
-function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMemo, setDraggingId }: {
+function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMemo, setDraggingId, onStatus }: {
   lead: Lead; users: User[]; selectedId: number | null; draggingId: number | null;
   onSelect: (id: number) => void; onSaveMemo: (leadId: number, body: string) => Promise<void>;
   setDraggingId: (id: number | null) => void;
+  onStatus: (id: number, s: CrmStatus) => Promise<void>;
 }) {
   const [memoOpen, setMemoOpen] = useState(false);
   const [memoText, setMemoText] = useState("");
@@ -644,25 +645,31 @@ function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMe
 
   return (
     <div draggable onDragStart={() => setDraggingId(l.id)} onDragEnd={() => setDraggingId(null)} onClick={() => onSelect(l.id)}
-      className={`p-4 rounded-xl shadow-sm border bg-white cursor-grab transition-all hover:shadow-md ${statusStyles[l.crmStatus].border} ${selectedId === l.id ? "ring-2 ring-primary" : ""} ${draggingId === l.id ? "opacity-40" : ""}`}
+      className={`p-3 md:p-4 rounded-xl shadow-sm border bg-white cursor-grab transition-all hover:shadow-md ${statusStyles[l.crmStatus].border} ${selectedId === l.id ? "ring-2 ring-primary" : ""} ${draggingId === l.id ? "opacity-40" : ""}`}
     >
       <div className="flex justify-between items-start mb-2">
-        <div><div className="font-bold text-sm">{l.name}</div><PhoneLink phone={l.phone} className="text-[10px] text-slate-500" /></div>
+        <div><div className="font-bold text-sm">{l.name}</div><PhoneLink phone={l.phone} className="text-xs md:text-[10px] text-slate-500" /></div>
         <div className="text-[10px] text-slate-400 whitespace-nowrap">{fmtCreatedAt(l.createdAt)}</div>
       </div>
-      <div className="flex flex-wrap gap-1 mb-3">
+      <div className="flex flex-wrap gap-1 mb-2 md:mb-3">
         {l.age != null && <TagChip label={`${l.age}세`} tone="blue" />}
         {l.gender && <TagChip label={l.gender === "남" ? "남" : "여"} tone={l.gender === "남" ? "blue" : "pink"} />}
         {l.media && <TagChip label={l.media} tone="purple" />}
         <TagChip label={l.careTag} tone={l.careTag.includes("임플란트") ? "indigo" : "slate"} />
         {l.appointmentAt && <TagChip label={`${new Date(l.appointmentAt).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })} 예약`} tone="green" />}
       </div>
+      {/* Mobile status dropdown */}
+      <div className="mb-2 md:hidden" onClick={e => e.stopPropagation()}>
+        <select value={l.crmStatus} onChange={e => onStatus(l.id, e.target.value as CrmStatus)} className={`w-full text-[11px] font-bold border-slate-200 rounded px-2 py-1.5 bg-white focus:ring-1 focus:ring-primary ${statusStyles[l.crmStatus].badge}`}>
+          {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </div>
 
       {/* Inline memo */}
       <div className="mt-2 pt-2 border-t border-slate-50" onClick={e => e.stopPropagation()}>
         {!memoOpen ? (
           <button onClick={() => { setMemoOpen(true); setTimeout(() => textareaRef.current?.focus(), 0); }}
-            className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-primary transition-colors w-full">
+            className="flex items-center gap-1 text-xs py-1 md:text-[10px] md:py-0 text-slate-400 hover:text-primary transition-colors w-full">
             <span className="material-icons text-[12px]">edit_note</span> 메모 입력...
           </button>
         ) : (
@@ -673,9 +680,9 @@ function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMe
               onKeyDown={e => { if (e.ctrlKey && e.key === "Enter") { e.preventDefault(); handleSave(); } if (e.key === "Escape") { setMemoOpen(false); setMemoText(""); } }}
             />
             <div className="flex items-center justify-end gap-1">
-              <button onClick={() => { setMemoOpen(false); setMemoText(""); }} className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-500">취소</button>
+              <button onClick={() => { setMemoOpen(false); setMemoText(""); }} className="text-xs px-3 py-1.5 md:text-[10px] md:px-2 md:py-0.5 rounded bg-slate-100 text-slate-500">취소</button>
               <button onClick={handleSave} disabled={saving || !memoText.trim()}
-                className="text-[10px] px-2 py-0.5 rounded bg-primary text-white disabled:opacity-40">
+                className="text-xs px-3 py-1.5 md:text-[10px] md:px-2 md:py-0.5 rounded bg-primary text-white disabled:opacity-40">
                 {saving ? "저장..." : "저장"}
               </button>
             </div>
@@ -691,7 +698,38 @@ function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, on
   const stop = (e: React.MouseEvent | React.ChangeEvent) => e.stopPropagation();
   return (
     <div className="h-full flex flex-col bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-      <div className="flex-1 overflow-auto relative">
+      {/* Mobile card list */}
+      <div className="flex-1 overflow-auto md:hidden">
+        {loading && <div className="flex items-center justify-center py-10"><span className="material-icons text-slate-400 animate-pulse">hourglass_empty</span></div>}
+        {!loading && leads.length === 0 && <div className="py-20 text-center text-slate-400">조회된 데이터가 없습니다.</div>}
+        {!loading && <div className="divide-y divide-slate-100">
+          {leads.map((l) => (
+            <div key={l.id} onClick={() => onSelect(l.id)} className={`p-3 cursor-pointer transition-colors ${selectedId === l.id ? "bg-blue-50/50" : ""}`}>
+              <div className="flex justify-between items-start mb-2">
+                <div><div className="font-bold text-sm text-slate-900">{l.name}</div><PhoneLink phone={l.phone} className="text-xs text-slate-500" /></div>
+                <div className="text-[10px] text-slate-400 whitespace-nowrap">{fmtCreatedAt(l.createdAt)}</div>
+              </div>
+              <div className="flex flex-wrap gap-1 mb-2">
+                {l.age != null && <TagChip label={`${l.age}세`} tone="blue" />}
+                {l.gender && <TagChip label={l.gender === "남" ? "남" : "여"} tone={l.gender === "남" ? "blue" : "pink"} />}
+                {l.media && <TagChip label={l.media} tone="purple" />}
+                <TagChip label={l.careTag} tone={l.careTag.includes("임플란트") ? "indigo" : "slate"} />
+              </div>
+              <div className="flex items-center gap-2" onClick={stop}>
+                <select value={l.crmStatus} onChange={e => onStatus(l.id, e.target.value as CrmStatus)} className={`text-[11px] font-bold border-slate-200 rounded px-2 py-1.5 bg-white focus:ring-1 focus:ring-primary flex-1 ${statusStyles[l.crmStatus].badge}`}>
+                  {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <select value={l.assigneeId || ""} onChange={e => onAssignee(l.id, e.target.value ? Number(e.target.value) : null)} className="text-[11px] border-slate-200 rounded px-2 py-1.5 bg-white flex-1">
+                  <option value="">미할당</option>
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
+            </div>
+          ))}
+        </div>}
+      </div>
+      {/* Desktop table */}
+      <div className="flex-1 overflow-auto relative hidden md:block">
         {loading && <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-10 flex items-center justify-center"><span className="material-icons text-slate-400 animate-pulse">hourglass_empty</span></div>}
         <table className="w-full text-left text-sm border-collapse">
           <thead className="sticky top-0 bg-slate-50 border-b border-border z-10">
@@ -756,11 +794,11 @@ function CalendarView({ events }: { events: CalendarEvent[] }) {
   }, [events, cur]);
   return (
     <div className="h-full flex flex-col bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-      <div className="p-4 bg-slate-50 border-b border-border flex justify-between items-center"><h3 className="font-bold">{cur.getFullYear()}년 {cur.getMonth()+1}월 일정</h3><div className="flex gap-1"><button onClick={() => setCur(new Date(cur.getFullYear(), cur.getMonth()-1))} className="p-1 border border-border rounded hover:bg-white"><span className="material-icons">chevron_left</span></button><button onClick={() => setCur(new Date())} className="px-3 py-1 border border-border rounded hover:bg-white text-xs">오늘</button><button onClick={() => setCur(new Date(cur.getFullYear(), cur.getMonth()+1))} className="p-1 border border-border rounded hover:bg-white"><span className="material-icons">chevron_right</span></button></div></div>
+      <div className="p-3 md:p-4 bg-slate-50 border-b border-border flex justify-between items-center"><h3 className="font-bold">{cur.getFullYear()}년 {cur.getMonth()+1}월 일정</h3><div className="flex gap-1"><button onClick={() => setCur(new Date(cur.getFullYear(), cur.getMonth()-1))} className="p-2 md:p-1 border border-border rounded hover:bg-white"><span className="material-icons">chevron_left</span></button><button onClick={() => setCur(new Date())} className="px-3 py-1 border border-border rounded hover:bg-white text-xs">오늘</button><button onClick={() => setCur(new Date(cur.getFullYear(), cur.getMonth()+1))} className="p-2 md:p-1 border border-border rounded hover:bg-white"><span className="material-icons">chevron_right</span></button></div></div>
       <div className="flex-1 overflow-auto p-4"><div className="grid grid-cols-7 bg-slate-200 border border-slate-200 gap-px">
-        {["일","월","화","수","목","금","토"].map(d => <div key={d} className="bg-slate-50 py-2 text-center text-[10px] font-bold text-slate-400">{d}</div>)}
-        {Array.from({length: start}).map((_, i) => <div key={i} className="bg-slate-50/50 min-h-[100px]"></div>)}
-        {Array.from({length: days}).map((_, i) => { const d = i+1; return <div key={d} className="bg-white min-h-[100px] p-2 space-y-1"><div className="text-[10px] text-slate-400 font-bold">{d}</div>{grouped[d]?.map(e => <div key={e.id} className={`text-[9px] p-1 rounded border truncate ${e.type==='appointment'?'bg-emerald-50 border-emerald-100 text-emerald-700':'bg-blue-50 border-blue-100 text-blue-700'}`}>{e.patientName}</div>)}</div> })}
+        {["일","월","화","수","목","금","토"].map(d => <div key={d} className="bg-slate-50 py-1 text-center text-[9px] md:py-2 md:text-[10px] font-bold text-slate-400">{d}</div>)}
+        {Array.from({length: start}).map((_, i) => <div key={i} className="bg-slate-50/50 min-h-[60px] md:min-h-[100px]"></div>)}
+        {Array.from({length: days}).map((_, i) => { const d = i+1; return <div key={d} className="bg-white min-h-[60px] md:min-h-[100px] p-1 md:p-2 space-y-1"><div className="text-[10px] text-slate-400 font-bold">{d}</div>{grouped[d]?.map(e => <div key={e.id} className={`text-[9px] p-1 rounded border truncate ${e.type==='appointment'?'bg-emerald-50 border-emerald-100 text-emerald-700':'bg-blue-50 border-blue-100 text-blue-700'}`}>{e.patientName}</div>)}</div> })}
       </div></div>
     </div>
   );
@@ -877,9 +915,11 @@ function LeadDrawer({
   return (
     <>
       <div className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm" onClick={onClose}></div>
-      <aside className="fixed top-0 right-0 z-40 h-full w-[420px] bg-white shadow-2xl flex flex-col translate-x-0 transition-transform">
+      <aside className="fixed bottom-0 left-0 right-0 z-40 max-h-[90vh] w-full rounded-t-2xl md:top-0 md:bottom-auto md:left-auto md:right-0 md:h-full md:max-h-full md:w-[420px] md:rounded-none bg-white shadow-2xl flex flex-col translate-x-0 transition-transform">
+        {/* Mobile drag handle */}
+        <div className="flex justify-center pt-2 pb-1 md:hidden"><div className="w-10 h-1 rounded-full bg-slate-300"></div></div>
         {/* Header */}
-        <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-white shrink-0">
+        <div className="p-4 md:p-6 border-b border-slate-100 flex justify-between items-start bg-white shrink-0">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center text-primary font-bold text-xl shrink-0">{lead?.name?.[0] || "?"}</div>
             <div>
@@ -893,7 +933,7 @@ function LeadDrawer({
               </div>
             </div>
           </div>
-          <button ref={closeBtnRef} onClick={onClose} className="text-slate-400 hover:text-slate-600"><span className="material-icons">close</span></button>
+          <button ref={closeBtnRef} onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2 -m-2 md:p-0 md:m-0"><span className="material-icons">close</span></button>
         </div>
 
         {/* Scrollable content */}
@@ -917,7 +957,7 @@ function LeadDrawer({
           {!loading && !error && lead && (
             <>
               {/* Status & Assignment */}
-              <div className="p-6 space-y-6">
+              <div className="p-4 space-y-4 md:p-6 md:space-y-6">
                 <section>
                   <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">상태 변경</h4>
                   <div className="flex items-center gap-2">
@@ -1125,7 +1165,7 @@ function LeadDrawer({
 
         {/* Footer Action Buttons */}
         {lead && !loading && !error && (
-          <div className="p-4 bg-white border-t border-slate-200 grid grid-cols-2 gap-3 shrink-0">
+          <div className="p-3 gap-2 md:p-4 md:gap-3 bg-white border-t border-slate-200 grid grid-cols-2 shrink-0">
             <div className="relative group">
               <button
                 onClick={() => setQuickMenuOpen(!quickMenuOpen)}
@@ -1174,7 +1214,7 @@ function PhoneLink({ phone, className = "" }: { phone: string; className?: strin
   return (
     <span className={`inline-flex items-center gap-1 ${className}`} onClick={e => e.stopPropagation()}>
       <a href={`tel:${phone}`} className="hover:underline hover:text-primary transition-colors" title="전화 걸기">{phone}</a>
-      <button onClick={copy} className="text-slate-400 hover:text-primary transition-colors shrink-0" title="번호 복사" aria-label="전화번호 복사">
+      <button onClick={copy} className="text-slate-400 hover:text-primary transition-colors shrink-0 p-1 -m-1 md:p-0 md:m-0" title="번호 복사" aria-label="전화번호 복사">
         <span className="material-icons" style={{ fontSize: "12px" }}>{copied ? "check" : "content_copy"}</span>
       </button>
     </span>
@@ -1193,7 +1233,7 @@ function TagChip({ label, tone }: { label: string; tone: "indigo" | "slate" | "a
     gray: "bg-slate-50 text-slate-500",
     green: "bg-emerald-50 text-emerald-700",
   }[tone];
-  return <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${classes}`} title={label} aria-label={label}>{label}</span>;
+  return <span className={`px-2 py-1 text-[11px] md:px-1.5 md:py-0.5 md:text-[10px] rounded font-bold ${classes}`} title={label} aria-label={label}>{label}</span>;
 }
 
 function Legend() {
