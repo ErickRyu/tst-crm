@@ -545,9 +545,9 @@ function CrmShell() {
             </label>
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto md:gap-4">
-            <div className="relative flex-1 md:flex-none"><span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">search</span><input ref={searchInputRef} type="text" placeholder="환자명, 전화번호..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-64 bg-slate-100 border-none rounded-lg py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary/20" /></div>
-            <select value={selectedUserId || ""} onChange={(e) => { const v = e.target.value ? Number(e.target.value) : null; setSelectedUserId(v); if(v) setScope("mine"); }} className="bg-card border border-border rounded-lg px-3 py-2 text-sm font-medium">
+          <div className="flex items-center flex-wrap gap-2 w-full md:w-auto md:flex-nowrap md:gap-4">
+            <div className="relative flex-1 min-w-0 md:flex-none"><span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">search</span><input ref={searchInputRef} type="text" placeholder="환자명, 전화번호..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-64 bg-slate-100 border-none rounded-lg py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary/20" /></div>
+            <select value={selectedUserId || ""} onChange={(e) => { const v = e.target.value ? Number(e.target.value) : null; setSelectedUserId(v); if(v) setScope("mine"); }} className="shrink-0 bg-card border border-border rounded-lg px-3 py-2 text-sm font-medium">
               <option value="">전체 상담원</option>
               {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
@@ -915,7 +915,7 @@ function LeadDrawer({
   return (
     <>
       <div className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm" onClick={onClose}></div>
-      <aside className="fixed bottom-0 left-0 right-0 z-40 max-h-[90vh] w-full rounded-t-2xl md:top-0 md:bottom-auto md:left-auto md:right-0 md:h-full md:max-h-full md:w-[420px] md:rounded-none bg-white shadow-2xl flex flex-col translate-x-0 transition-transform">
+      <aside className="fixed bottom-0 left-0 right-0 z-40 max-h-[90vh] w-full rounded-t-2xl md:top-0 md:bottom-auto md:left-auto md:right-0 md:h-full md:max-h-full md:w-[420px] md:rounded-none bg-white shadow-2xl flex flex-col">
         {/* Mobile drag handle */}
         <div className="flex justify-center pt-2 pb-1 md:hidden"><div className="w-10 h-1 rounded-full bg-slate-300"></div></div>
         {/* Header */}
