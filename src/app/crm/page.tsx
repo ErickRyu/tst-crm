@@ -682,13 +682,11 @@ function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMe
         )}
       </div>
 
-      <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50" onClick={e => e.stopPropagation()}>
-         <div className="flex items-center gap-1 text-[10px] text-slate-400">
-           <span className="material-icons text-[12px]">person</span>
-           {users.find(u => u.id === l.assigneeId)?.name || "미할당"}
-         </div>
-         <div className="text-[10px] text-slate-400">{l.lastCallAt ? new Date(l.lastCallAt).toLocaleDateString() : ""}</div>
-      </div>
+      {l.lastCallAt && (
+        <div className="flex items-center justify-end mt-2 pt-2 border-t border-slate-50">
+          <div className="text-[10px] text-slate-400">{new Date(l.lastCallAt).toLocaleDateString()}</div>
+        </div>
+      )}
     </div>
   );
 }
