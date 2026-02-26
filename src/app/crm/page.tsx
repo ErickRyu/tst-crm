@@ -45,6 +45,7 @@ interface Lead {
   age: number | null;
   gender: string | null;
   media: string;
+  memoBody: string | null;
 }
 
 interface CalendarEvent {
@@ -154,8 +155,6 @@ function CrmShell() {
   const [memoInput, setMemoInput] = useState("");
   const [memoLoading, setMemoLoading] = useState(false);
   const [memoSaving, setMemoSaving] = useState(false);
-  const [editingMemoId, setEditingMemoId] = useState<number | null>(null);
-  const [editingBody, setEditingBody] = useState("");
   const [smsTemplates, setSmsTemplates] = useState<SmsTemplate[]>([]);
   const [smsSending, setSmsSending] = useState(false);
   const [smsTestMode, setSmsTestMode] = useState(true);
@@ -320,7 +319,9 @@ function CrmShell() {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.message || "메모 조회 실패");
-        setMemos(json.data || []);
+        const data = (json.data || []) as LeadMemo[];
+        setMemos(data);
+        setMemoInput(data[0]?.body || "");
       } catch (e) {
         pushToast(e instanceof Error ? e.message : "메모 조회 실패", "error");
       } finally {
@@ -331,6 +332,7 @@ function CrmShell() {
       void fetchMemos(selectedLeadId);
     } else {
       setMemos([]);
+      setMemoInput("");
     }
   }, [selectedLeadId, pushToast, apiKey]);
 
@@ -403,70 +405,12 @@ function CrmShell() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "메모 저장 실패");
-      setMemos(prev => [{ ...(json.data as LeadMemo) }, ...prev]);
-      setMemoInput("");
+      setMemos([json.data as LeadMemo]);
       pushToast("메모가 저장되었습니다.", "success");
     } catch (e) {
       pushToast(e instanceof Error ? e.message : "메모 저장 실패", "error");
     } finally {
       setMemoSaving(false);
-    }
-  };
-
-  const startEditMemo = (memo: LeadMemo) => {
-    setEditingMemoId(memo.id);
-    setEditingBody(memo.body);
-  };
-
-  const cancelEditMemo = () => {
-    setEditingMemoId(null);
-    setEditingBody("");
-  };
-
-  const updateMemo = async (memo: LeadMemo) => {
-    if (!editingBody.trim()) {
-      pushToast("메모를 입력하세요.", "error");
-      return;
-    }
-    if (editingBody.length > 2000) {
-      pushToast("메모는 2000자 이하로 작성해주세요.", "error");
-      return;
-    }
-    try {
-      setMemoSaving(true);
-      const res = await fetch(`/api/crm/leads/${memo.leadId}/memos/${memo.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...(apiKey ? { "x-api-key": apiKey } : {}) },
-        body: JSON.stringify({ body: editingBody.trim(), version: memo.version || 1 }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || "메모 수정 실패");
-      setMemos(prev => prev.map(m => m.id === memo.id ? { ...m, ...json.data } : m));
-      cancelEditMemo();
-      pushToast("메모가 수정되었습니다.", "success");
-    } catch (e) {
-      pushToast(e instanceof Error ? e.message : "메모 수정 실패", "error");
-    } finally {
-      setMemoSaving(false);
-    }
-  };
-
-  const deleteMemo = async (memo: LeadMemo) => {
-    if (!confirm("메모를 삭제하시겠습니까?")) return;
-    try {
-      const res = await fetch(`/api/crm/leads/${memo.leadId}/memos/${memo.id}`, {
-        method: "DELETE",
-        headers: apiKey ? { "x-api-key": apiKey } : undefined,
-      });
-      if (!res.ok && res.status !== 204) {
-        const json = await res.json();
-        throw new Error(json.message || "메모 삭제 실패");
-      }
-      setMemos(prev => prev.filter(m => m.id !== memo.id));
-      if (editingMemoId === memo.id) cancelEditMemo();
-      pushToast("메모가 삭제되었습니다.", "success");
-    } catch (e) {
-      pushToast(e instanceof Error ? e.message : "메모 삭제 실패", "error");
     }
   };
 
@@ -484,6 +428,13 @@ function CrmShell() {
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.message || "메모 저장 실패");
+    // 로컬 leads 상태에서 해당 리드의 memoBody 갱신
+    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, memoBody: body } : l));
+    // 현재 열린 리드와 같으면 메모 상태도 갱신
+    if (selectedLeadId === leadId) {
+      setMemos([json.data as LeadMemo]);
+      setMemoInput((json.data as LeadMemo).body);
+    }
     pushToast("메모가 저장되었습니다.", "success");
   };
 
@@ -601,16 +552,8 @@ function CrmShell() {
         memoInput={memoInput}
         memoSaving={memoSaving}
         memoLoading={memoLoading}
-        currentUser={currentUser}
         onMemoInput={setMemoInput}
         onSaveMemo={() => selectedLeadId && saveMemo(selectedLeadId)}
-        onEditMemo={startEditMemo}
-        onCancelEdit={cancelEditMemo}
-        onConfirmEdit={updateMemo}
-        editingMemoId={editingMemoId}
-        editingBody={editingBody}
-        onEditingBody={setEditingBody}
-        onDeleteMemo={deleteMemo}
         smsTemplates={smsTemplates}
         smsSending={smsSending}
         smsTestMode={smsTestMode}
@@ -654,12 +597,17 @@ function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMe
   const [saving, setSaving] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const openEditor = () => {
+    setMemoText(l.memoBody || "");
+    setMemoOpen(true);
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  };
+
   const handleSave = async () => {
     if (!memoText.trim()) return;
     try {
       setSaving(true);
       await onSaveMemo(l.id, memoText.trim());
-      setMemoText("");
       setMemoOpen(false);
     } catch { /* toast handled upstream */ }
     finally { setSaving(false); }
@@ -683,10 +631,18 @@ function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMe
       {/* Inline memo */}
       <div className="mt-2 pt-2 border-t border-slate-50" onClick={e => e.stopPropagation()}>
         {!memoOpen ? (
-          <button onClick={() => { setMemoOpen(true); setTimeout(() => textareaRef.current?.focus(), 0); }}
-            className="flex items-center gap-1 text-xs py-1 md:text-[10px] md:py-0 text-slate-400 hover:text-primary transition-colors w-full">
-            <span className="material-icons text-[12px]">edit_note</span> 메모 입력...
-          </button>
+          l.memoBody ? (
+            <button onClick={openEditor}
+              className="group flex items-start gap-1 text-left text-[11px] text-slate-600 leading-relaxed w-full hover:text-primary transition-colors">
+              <span className="material-icons text-[12px] mt-0.5 shrink-0 text-slate-300 group-hover:text-primary transition-colors">edit_note</span>
+              <span className="line-clamp-2">{l.memoBody}</span>
+            </button>
+          ) : (
+            <button onClick={openEditor}
+              className="flex items-center gap-1 text-xs py-1 md:text-[10px] md:py-0 text-slate-400 hover:text-primary transition-colors w-full">
+              <span className="material-icons text-[12px]">edit_note</span> 메모 입력...
+            </button>
+          )
         ) : (
           <div className="space-y-1.5">
             <textarea ref={textareaRef} value={memoText} onChange={e => setMemoText(e.target.value)}
@@ -835,14 +791,6 @@ function LeadDrawer({
   onSaveMemo,
   memoSaving,
   memoLoading,
-  currentUser,
-  onEditMemo,
-  onCancelEdit,
-  onConfirmEdit,
-  editingMemoId,
-  editingBody,
-  onEditingBody,
-  onDeleteMemo,
   smsTemplates,
   smsSending,
   smsTestMode,
@@ -863,14 +811,6 @@ function LeadDrawer({
   onSaveMemo: () => void;
   memoSaving: boolean;
   memoLoading: boolean;
-  currentUser: string;
-  onEditMemo: (m: LeadMemo) => void;
-  onCancelEdit: () => void;
-  onConfirmEdit: (m: LeadMemo) => void;
-  editingMemoId: number | null;
-  editingBody: string;
-  onEditingBody: (v: string) => void;
-  onDeleteMemo: (m: LeadMemo) => void;
   smsTemplates: SmsTemplate[];
   smsSending: boolean;
   smsTestMode: boolean;
@@ -1127,52 +1067,13 @@ function LeadDrawer({
                     {memoSaving ? "저장 중..." : "메모 저장"}
                   </button>
                 </div>
-                <div className="space-y-2 mt-3">
-                  {memoLoading && <div className="text-sm text-slate-400">메모를 불러오는 중...</div>}
-                  {!memoLoading && memos.map((m) => {
-                    const isOwner = m.authorName === currentUser;
-                    const isSystem = m.authorName.startsWith("[시스템]");
-                    const isEditing = editingMemoId === m.id;
-                    return (
-                      <div key={m.id} className={`border rounded-lg p-3 ${isSystem ? "bg-yellow-50 border-yellow-100" : "bg-white border-slate-200"}`}>
-                        <div className="text-[11px] text-slate-500 flex justify-between">
-                          <span className={`font-semibold ${isSystem ? "text-yellow-700" : "text-slate-600"}`}>
-                            {isSystem && <span className="material-icons text-[11px] mr-0.5 align-middle">sms</span>}
-                            {m.authorName}
-                          </span>
-                          <span title={new Date(m.createdAt).toLocaleString()}>{new Date(m.createdAt).toLocaleString()}</span>
-                        </div>
-                        {isEditing ? (
-                          <>
-                            <textarea
-                              value={editingBody}
-                              onChange={(e) => onEditingBody(e.target.value)}
-                              maxLength={2000}
-                              className="mt-2 w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-primary/30 focus:outline-none"
-                              rows={3}
-                            />
-                            <div className="mt-2 flex gap-2 justify-end text-xs">
-                              <button onClick={() => onConfirmEdit(m)} disabled={memoSaving} className={`px-3 py-1 rounded bg-primary text-white ${memoSaving ? "opacity-70" : ""}`}>저장</button>
-                              <button onClick={onCancelEdit} className="px-3 py-1 rounded bg-slate-100">취소</button>
-                            </div>
-                          </>
-                        ) : (
-                          <p className="mt-1 text-sm text-slate-800 whitespace-pre-wrap">{escapeHtml(m.body)}</p>
-                        )}
-                        <div className="mt-2 flex gap-2 justify-end text-[11px] text-slate-500">
-                          <span>{m.version ? `v${m.version}` : ""}</span>
-                          {isOwner && !isEditing && (
-                            <>
-                              <button onClick={() => onEditMemo(m)} className="underline">수정</button>
-                              <button onClick={() => onDeleteMemo(m)} className="underline text-red-500">삭제</button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {!memoLoading && memos.length === 0 && <div className="text-sm text-slate-400">메모가 없습니다.</div>}
-                </div>
+                {memoLoading && <div className="text-sm text-slate-400 mt-2">메모를 불러오는 중...</div>}
+                {!memoLoading && memos.length > 0 && memos[0].updatedAt && (
+                  <div className="text-[11px] text-slate-400 mt-2">
+                    마지막 수정: {new Date(memos[0].updatedAt).toLocaleString()}
+                    {memos[0].version ? ` (v${memos[0].version})` : ""}
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -1262,11 +1163,3 @@ function Legend() {
   );
 }
 
-function escapeHtml(text: string) {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}

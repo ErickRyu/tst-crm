@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, asc, eq, inArray, sql, SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { leads } from "@/lib/schema";
+import { leads, leadMemos } from "@/lib/schema";
 import {
   ACTIONABLE_STATUSES,
   CRM_PRIORITY,
@@ -15,7 +15,7 @@ function parseBoolean(value: string | null, fallback: boolean) {
   return value === "true";
 }
 
-function serializeLead(row: typeof leads.$inferSelect) {
+function serializeLead(row: typeof leads.$inferSelect, memoBody: string | null) {
   const crmStatus = (row.crmStatus || "신규인입") as CrmStatus;
   const senior = calculateSeniorBadge(row.birthDate);
 
@@ -29,6 +29,7 @@ function serializeLead(row: typeof leads.$inferSelect) {
     version: row.version,
     updatedAt: row.updatedAt,
     contactFailCount: row.contactFailCount,
+    memoBody,
   };
 }
 
@@ -76,8 +77,12 @@ export async function GET(request: NextRequest) {
     end`;
 
     const rows = await db
-      .select()
+      .select({
+        lead: leads,
+        memoBody: leadMemos.body,
+      })
       .from(leads)
+      .leftJoin(leadMemos, eq(leads.id, leadMemos.leadId))
       .where(where)
       .orderBy(
         priorityCase,
@@ -87,7 +92,15 @@ export async function GET(request: NextRequest) {
       )
       .limit(limit);
 
-    const data = rows.map(serializeLead);
+    // LEFT JOIN으로 메모가 여러 개인 리드가 중복될 수 있으므로 첫 행만 사용
+    const seen = new Set<number>();
+    const data = rows.reduce<ReturnType<typeof serializeLead>[]>((acc, r) => {
+      if (!seen.has(r.lead.id)) {
+        seen.add(r.lead.id);
+        acc.push(serializeLead(r.lead, r.memoBody));
+      }
+      return acc;
+    }, []);
 
     return NextResponse.json({
       code: 200,
