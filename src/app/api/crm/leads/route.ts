@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, asc, eq, inArray, sql, SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { leads, leadMemos } from "@/lib/schema";
 import {
@@ -64,18 +64,6 @@ export async function GET(request: NextRequest) {
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const priorityCase = sql<number>`case
-      when ${leads.crmStatus} = '1차부재' then 1
-      when ${leads.crmStatus} = '2차부재' then 2
-      when ${leads.crmStatus} = '3차부재' then 3
-      when ${leads.crmStatus} = '노쇼' then 4
-      when ${leads.crmStatus} = '신규인입' then 5
-      when ${leads.crmStatus} = '응대중' then 6
-      when ${leads.crmStatus} = '통화완료' then 7
-      when ${leads.crmStatus} = '예약완료' then 8
-      else 99
-    end`;
-
     const rows = await db
       .select({
         lead: leads,
@@ -85,10 +73,8 @@ export async function GET(request: NextRequest) {
       .leftJoin(leadMemos, eq(leads.id, leadMemos.leadId))
       .where(where)
       .orderBy(
-        priorityCase,
-        sql`coalesce(${leads.lastCallAt}, ${leads.createdAt}) asc`,
-        asc(leads.createdAt),
-        asc(leads.id)
+        desc(leads.createdAt),
+        desc(leads.id)
       )
       .limit(limit);
 
