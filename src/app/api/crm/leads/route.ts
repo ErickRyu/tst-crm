@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, desc, eq, inArray, SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { leads, leadMemos } from "@/lib/schema";
 import {
@@ -46,6 +46,8 @@ export async function GET(request: NextRequest) {
       Math.max(1, parseInt(searchParams.get("limit") || "100", 10))
     );
 
+    const orderFn = searchParams.get("sortOrder") === "asc" ? asc : desc;
+
     const conditions: SQL[] = [];
 
     if (scope === "mine") {
@@ -73,8 +75,8 @@ export async function GET(request: NextRequest) {
       .leftJoin(leadMemos, eq(leads.id, leadMemos.leadId))
       .where(where)
       .orderBy(
-        desc(leads.createdAt),
-        desc(leads.id)
+        orderFn(leads.createdAt),
+        orderFn(leads.id)
       )
       .limit(limit);
 

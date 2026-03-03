@@ -161,6 +161,7 @@ function CrmShell() {
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<CrmStatus | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [counselorOpen, setCounselorOpen] = useState(false);
   const hasLoaded = useRef(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -182,10 +183,11 @@ function CrmShell() {
   }, [pushToast]);
 
   const fetchLeads = useCallback(async () => {
-    const qs = new URLSearchParams({ 
-      scope, 
-      includeDone: String(includeDone), 
-      limit: "100" 
+    const qs = new URLSearchParams({
+      scope,
+      includeDone: String(includeDone),
+      limit: "100",
+      sortOrder
     });
     if (selectedUserId) {
       qs.set("assigneeId", String(selectedUserId));
@@ -196,7 +198,7 @@ function CrmShell() {
     const json = await res.json();
     if (!res.ok) throw new Error(json.message || "리드 조회 실패");
     setLeads((json.data || []) as Lead[]);
-  }, [scope, includeDone, selectedUserId]);
+  }, [scope, includeDone, selectedUserId, sortOrder]);
 
   const fetchCalendar = useCallback(async () => {
     const qs = new URLSearchParams();
@@ -498,6 +500,11 @@ function CrmShell() {
               <input type="checkbox" checked={includeDone} onChange={e => setIncludeDone(e.target.checked)} className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4" />
               <span className="text-[11px] font-bold text-slate-500">완료 항목 포함</span>
             </label>
+
+            <button onClick={() => setSortOrder(s => s === "desc" ? "asc" : "desc")} className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold text-slate-500 hover:bg-slate-100 transition-colors">
+              <span className="material-icons text-sm">swap_vert</span>
+              <span>{sortOrder === "desc" ? "최신순" : "오래된순"}</span>
+            </button>
           </div>
 
           <div className="flex items-center flex-wrap gap-2 w-full md:w-auto md:flex-nowrap md:gap-4">
