@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, asc, desc, eq, inArray, SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { leads, leadMemos } from "@/lib/schema";
 import {
@@ -48,7 +48,25 @@ export async function GET(request: NextRequest) {
 
     const orderFn = searchParams.get("sortOrder") === "asc" ? asc : desc;
 
+    const fromParam = searchParams.get("from");
+    const toParam = searchParams.get("to");
+
     const conditions: SQL[] = [];
+
+    if (fromParam) {
+      const fromDate = new Date(fromParam);
+      if (!Number.isNaN(fromDate.getTime())) {
+        conditions.push(gte(leads.createdAt, fromDate));
+      }
+    }
+    if (toParam) {
+      const toDate = new Date(toParam);
+      if (!Number.isNaN(toDate.getTime())) {
+        // to 날짜의 끝(다음날 자정)까지 포함
+        toDate.setDate(toDate.getDate() + 1);
+        conditions.push(lte(leads.createdAt, toDate));
+      }
+    }
 
     if (scope === "mine") {
       if (!assigneeId || Number.isNaN(assigneeId)) {
@@ -98,6 +116,8 @@ export async function GET(request: NextRequest) {
         scope,
         assigneeId,
         includeDone,
+        from: fromParam || undefined,
+        to: toParam || undefined,
         actionableStatuses: ACTIONABLE_STATUSES,
         doneStatuses: DONE_STATUSES,
       },

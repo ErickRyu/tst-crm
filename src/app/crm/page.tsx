@@ -162,6 +162,8 @@ function CrmShell() {
   const [dragOverStatus, setDragOverStatus] = useState<CrmStatus | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [counselorOpen, setCounselorOpen] = useState(false);
   const hasLoaded = useRef(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -193,12 +195,14 @@ function CrmShell() {
       qs.set("assigneeId", String(selectedUserId));
       if (scope !== "mine") setScope("mine");
     }
-    
+    if (dateFrom) qs.set("from", dateFrom);
+    if (dateTo) qs.set("to", dateTo);
+
     const res = await fetch(`/api/crm/leads?${qs.toString()}`);
     const json = await res.json();
     if (!res.ok) throw new Error(json.message || "리드 조회 실패");
     setLeads((json.data || []) as Lead[]);
-  }, [scope, includeDone, selectedUserId, sortOrder]);
+  }, [scope, includeDone, selectedUserId, sortOrder, dateFrom, dateTo]);
 
   const fetchCalendar = useCallback(async () => {
     const qs = new URLSearchParams();
@@ -505,6 +509,55 @@ function CrmShell() {
               <span className="material-icons text-sm">swap_vert</span>
               <span>{sortOrder === "desc" ? "최신순" : "오래된순"}</span>
             </button>
+
+            {/* 날짜 필터 */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg shrink-0 ml-0 md:ml-2">
+              {([
+                ["전체", "", ""],
+                ["오늘", 0, 0],
+                ["7일", 7, 0],
+                ["30일", 30, 0],
+              ] as [string, number | "", number | ""][]).map(([label, daysBack]) => {
+                const isActive = daysBack === ""
+                  ? !dateFrom && !dateTo
+                  : (() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() - (daysBack as number));
+                      const pad = (n: number) => String(n).padStart(2, "0");
+                      const expected = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+                      const today = new Date();
+                      const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+                      return dateFrom === expected && dateTo === todayStr;
+                    })();
+                return (
+                  <button
+                    key={label}
+                    onClick={() => {
+                      if (daysBack === "") {
+                        setDateFrom("");
+                        setDateTo("");
+                      } else {
+                        const d = new Date();
+                        const pad = (n: number) => String(n).padStart(2, "0");
+                        const todayStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+                        d.setDate(d.getDate() - (daysBack as number));
+                        const fromStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+                        setDateFrom(fromStr);
+                        setDateTo(todayStr);
+                      }
+                    }}
+                    className={`px-2 py-1 text-[10px] md:px-3 md:py-1.5 md:text-xs font-medium rounded transition-all ${isActive ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-1 shrink-0 ml-0 md:ml-1">
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="bg-slate-100 border-none rounded-lg px-2 py-1 text-[11px] md:text-xs focus:ring-2 focus:ring-primary/20" />
+              <span className="text-slate-400 text-xs">~</span>
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="bg-slate-100 border-none rounded-lg px-2 py-1 text-[11px] md:text-xs focus:ring-2 focus:ring-primary/20" />
+            </div>
           </div>
 
           <div className="flex items-center flex-wrap gap-2 w-full md:w-auto md:flex-nowrap md:gap-4">
