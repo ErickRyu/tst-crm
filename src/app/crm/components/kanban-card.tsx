@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, memo } from "react";
 import type { Lead, User } from "../types";
 import { statusStyles, fmtCreatedAt } from "../types";
 import { PhoneLink } from "./phone-link";
 import { TagChip } from "./tag-chip";
 import { Button } from "@/components/ui/button";
 
-export function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMemo, setDraggingId }: {
+export const KanbanCard = memo(function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMemo, setDraggingId }: {
   lead: Lead; users: User[]; selectedId: number | null; draggingId: number | null;
   onSelect: (id: number) => void; onSaveMemo: (leadId: number, body: string) => Promise<void>;
   setDraggingId: (id: number | null) => void;
@@ -81,4 +81,18 @@ export function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, o
       </div>
     </div>
   );
-}
+}, (prev, next) => {
+  return prev.lead.id === next.lead.id
+    && prev.lead.crmStatus === next.lead.crmStatus
+    && prev.lead.memoBody === next.lead.memoBody
+    && prev.lead.name === next.lead.name
+    && prev.lead.phone === next.lead.phone
+    && prev.lead.appointmentAt === next.lead.appointmentAt
+    && prev.lead.createdAt === next.lead.createdAt
+    && prev.lead.age === next.lead.age
+    && prev.lead.gender === next.lead.gender
+    && prev.lead.media === next.lead.media
+    && prev.lead.careTag === next.lead.careTag
+    && prev.selectedId === next.selectedId
+    && prev.draggingId === next.draggingId;
+});

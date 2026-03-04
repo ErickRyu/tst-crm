@@ -119,7 +119,11 @@ export function CrmShell() {
     const res = await fetch(`/api/crm/leads?${qs.toString()}`);
     const json = await res.json();
     if (!res.ok) throw new Error(json.message || "리드 조회 실패");
-    setLeads((json.data || []) as Lead[]);
+    const newLeads = (json.data || []) as Lead[];
+    setLeads(prev => {
+      if (JSON.stringify(prev) === JSON.stringify(newLeads)) return prev;
+      return newLeads;
+    });
 
     if (viewMode === "list" && json.meta) {
       setTotalCount(json.meta.totalCount ?? 0);
@@ -135,7 +139,13 @@ export function CrmShell() {
     if (selectedUserId) qs.set("assigneeId", String(selectedUserId));
     const res = await fetch(`/api/crm/calendar?${qs.toString()}`);
     const json = await res.json();
-    if (res.ok) setCalendarEvents((json.data || []) as CalendarEvent[]);
+    if (res.ok) {
+      const newEvents = (json.data || []) as CalendarEvent[];
+      setCalendarEvents(prev => {
+        if (JSON.stringify(prev) === JSON.stringify(newEvents)) return prev;
+        return newEvents;
+      });
+    }
   }, [selectedUserId]);
 
   const refreshAll = useCallback(async () => {
