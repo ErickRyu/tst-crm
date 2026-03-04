@@ -105,14 +105,9 @@ export const SMS_TEMPLATES: SmsTemplate[] = [
   },
 ];
 
-// ---------- Byte calculation utility ----------
-export function calcMsgType(msg: string): { byteLength: number; msgType: "SMS" | "LMS" } {
-  let byteLength = 0;
-  for (const ch of msg) {
-    byteLength += ch.charCodeAt(0) > 127 ? 2 : 1;
-  }
-  return { byteLength, msgType: byteLength > 90 ? "LMS" : "SMS" };
-}
+// ---------- Byte calculation utility (re-exported from sms-utils) ----------
+import { calcMsgType } from "./sms-utils";
+export { calcMsgType };
 
 // ---------- Send SMS ----------
 export async function sendSms(params: {
