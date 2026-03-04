@@ -19,6 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuGroup,
+} from "@/components/ui/dropdown-menu";
 
 interface LeadDrawerProps {
   lead: Lead | null;
@@ -67,7 +76,6 @@ export function LeadDrawer({
 }: LeadDrawerProps) {
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   const [smsMsg, setSmsMsg] = useState("");
-  const [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [washing, setWashing] = useState(false);
   const [clinicName, setClinicName] = useState("");
@@ -104,7 +112,6 @@ export function LeadDrawer({
 
   useEffect(() => {
     setSmsMsg("");
-    setQuickMenuOpen(false);
   }, [lead?.id]);
 
   const handleSendSms = () => {
@@ -139,7 +146,7 @@ export function LeadDrawer({
   const { byteLength: previewBytes, msgType: previewMsgType } = calcMsgType(previewMsg);
 
   const handleTemplateSelect = (tpl: SmsTemplate) => {
-    if (!lead) { setSmsMsg(tpl.body); setQuickMenuOpen(false); return; }
+    if (!lead) { setSmsMsg(tpl.body); return; }
     let msg = tpl.body;
     // {고객명} and legacy %고객명% replacement
     msg = msg.replace(/\{고객명\}/g, lead.name);
@@ -163,7 +170,6 @@ export function LeadDrawer({
     const pad2 = (n: number) => String(n).padStart(2, "0");
     msg = msg.replace(/\{Today\}/g, `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`);
     setSmsMsg(msg);
-    setQuickMenuOpen(false);
   };
 
   return (
@@ -315,12 +321,53 @@ export function LeadDrawer({
                 </div>
                 <div className="flex items-center justify-between mt-3">
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setQuickMenuOpen(!quickMenuOpen)}
-                      className="text-xs flex items-center gap-1 px-2 py-1 bg-yellow-50 text-yellow-600 rounded border border-yellow-100 hover:bg-yellow-100 transition-colors"
-                    >
-                      <span className="material-icons text-[14px]">bolt</span> 빠른 답변
-                    </button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          className="text-xs flex items-center gap-1 px-2 py-1 bg-yellow-50 text-yellow-600 rounded border border-yellow-100 hover:bg-yellow-100 transition-colors"
+                        >
+                          <span className="material-icons text-[14px]">bolt</span> 빠른 답변
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-64 max-h-72 overflow-y-auto">
+                        {(() => {
+                          const recommended = smsTemplates.filter(t => t.statuses?.includes(lead.crmStatus));
+                          const others = smsTemplates.filter(t => !t.statuses?.includes(lead.crmStatus));
+                          return (
+                            <>
+                              {recommended.length > 0 && (
+                                <DropdownMenuGroup>
+                                  <DropdownMenuLabel className="text-[10px] font-bold text-primary uppercase tracking-wider">추천 ({lead.crmStatus})</DropdownMenuLabel>
+                                  {recommended.map((tpl) => (
+                                    <DropdownMenuItem key={tpl.key} onClick={() => handleTemplateSelect(tpl)} className="gap-2 cursor-pointer">
+                                      <span className="material-icons text-sm text-primary">{tpl.icon}</span>
+                                      <span className="font-medium">{tpl.label}</span>
+                                      <span className="ml-auto text-[10px] text-slate-400">{tpl.msgType}</span>
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuGroup>
+                              )}
+                              {recommended.length > 0 && others.length > 0 && <DropdownMenuSeparator />}
+                              {others.length > 0 && (
+                                <DropdownMenuGroup>
+                                  {recommended.length > 0 && <DropdownMenuLabel className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">전체</DropdownMenuLabel>}
+                                  {others.map((tpl) => (
+                                    <DropdownMenuItem key={tpl.key} onClick={() => handleTemplateSelect(tpl)} className="gap-2 cursor-pointer">
+                                      <span className="material-icons text-sm text-slate-400">{tpl.icon}</span>
+                                      <span>{tpl.label}</span>
+                                      <span className="ml-auto text-[10px] text-slate-400">{tpl.msgType}</span>
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuGroup>
+                              )}
+                              {smsTemplates.length === 0 && (
+                                <div className="px-2 py-3 text-sm text-slate-400 text-center">템플릿이 없습니다.</div>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <button
                       onClick={() => setPreviewOpen(!previewOpen)}
                       className={`text-xs flex items-center gap-1 px-2 py-1 rounded border transition-colors ${previewOpen ? "bg-primary/10 text-primary border-primary/20" : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100"}`}
@@ -336,45 +383,6 @@ export function LeadDrawer({
                     {smsSending ? "발송 중..." : "전송"}
                   </Button>
                 </div>
-
-                {/* Quick Template Menu */}
-                {quickMenuOpen && (() => {
-                  const recommended = smsTemplates.filter(t => t.statuses?.includes(lead.crmStatus));
-                  const others = smsTemplates.filter(t => !t.statuses?.includes(lead.crmStatus));
-                  return (
-                    <div className="mt-2 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden max-h-64 overflow-y-auto">
-                      {recommended.length > 0 && (
-                        <>
-                          <div className="px-4 py-1.5 bg-primary/5 text-[10px] font-bold text-primary uppercase tracking-wider">추천 ({lead.crmStatus})</div>
-                          {recommended.map((tpl) => (
-                            <button key={tpl.key} onClick={() => handleTemplateSelect(tpl)}
-                              className="w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-primary/5 flex items-center gap-2 text-left transition-colors border-l-2 border-l-primary">
-                              <span className="material-icons text-sm text-primary">{tpl.icon}</span>
-                              <span className="font-medium">{tpl.label}</span>
-                              <span className="ml-auto text-[10px] text-slate-400">{tpl.msgType}</span>
-                            </button>
-                          ))}
-                        </>
-                      )}
-                      {others.length > 0 && (
-                        <>
-                          {recommended.length > 0 && <div className="px-4 py-1.5 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider">전체</div>}
-                          {others.map((tpl) => (
-                            <button key={tpl.key} onClick={() => handleTemplateSelect(tpl)}
-                              className="w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 text-left transition-colors">
-                              <span className="material-icons text-sm text-slate-400">{tpl.icon}</span>
-                              <span>{tpl.label}</span>
-                              <span className="ml-auto text-[10px] text-slate-400">{tpl.msgType}</span>
-                            </button>
-                          ))}
-                        </>
-                      )}
-                      {smsTemplates.length === 0 && (
-                        <div className="px-4 py-3 text-sm text-slate-400">템플릿이 없습니다.</div>
-                      )}
-                    </div>
-                  );
-                })()}
 
                 {/* Phone Preview */}
                 {previewOpen && (
@@ -397,16 +405,9 @@ export function LeadDrawer({
 
         {/* Footer Action Buttons */}
         {lead && !loading && !error && (
-          <div className="p-3 gap-2 md:p-4 md:gap-3 bg-white border-t border-slate-200 grid grid-cols-2 shrink-0">
+          <div className="p-3 md:p-4 bg-white border-t border-slate-200 shrink-0">
             <Button
-              variant="outline"
-              onClick={() => setQuickMenuOpen(!quickMenuOpen)}
               className="w-full"
-            >
-              <span className="material-icons text-[18px] text-primary">send</span> 빠른 메시지
-              <span className="material-icons text-[16px]">{quickMenuOpen ? "expand_less" : "expand_more"}</span>
-            </Button>
-            <Button
               onClick={() => lead.appointmentAt ? undefined : onSchedule(lead.id, "appointmentAt", new Date().toISOString())}
             >
               <span className="material-icons text-[18px]">event</span> 예약 하기
