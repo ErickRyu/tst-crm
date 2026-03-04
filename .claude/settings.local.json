@@ -8,7 +8,24 @@
       "Bash(npx next lint)",
       "Bash(npx next build)",
       "Bash(curl:*)",
-      "Bash(API_KEY=\"eb0c520cf5412fb14a249b63e94be53ed2b90baeddb76dc1ed6b3c6eb3167f6a\")"
+      "Bash(API_KEY=\"eb0c520cf5412fb14a249b63e94be53ed2b90baeddb76dc1ed6b3c6eb3167f6a\")",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "WebFetch(domain:www.dentweb.co.kr)",
+      "mcp__stitch__list_projects",
+      "WebFetch(domain:github.com)",
+      "Bash(sqlite3:*)",
+      "WebFetch(domain:vibekanban.com)",
+      "mcp__vibe_kanban__list_tags",
+      "mcp__vibe_kanban__create_issue",
+      "mcp__vibe_kanban__list_issues",
+      "mcp__vibe_kanban__add_issue_tag",
+      "mcp__vibe_kanban__create_issue_relationship",
+      "mcp__vibe_kanban__get_issue",
+      "mcp__vibe_kanban__update_issue",
+      "Bash(tail:*)",
+      "mcp__vibe_kanban__list_projects",
+      "mcp__vibe_kanban__list_organizations"
     ]
   }
 }
