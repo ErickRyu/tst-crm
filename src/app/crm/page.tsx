@@ -77,6 +77,15 @@ interface SmsTemplate {
 }
 
 // Props Interfaces
+interface PaginationProps {
+  currentPage: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+}
+
 interface ViewProps {
   leads: Lead[];
   users: User[];
@@ -86,6 +95,7 @@ interface ViewProps {
   onAssignee: (id: number, userId: number | null) => Promise<void>;
   onSchedule: (id: number, field: string, val: string) => Promise<void>;
   loading?: boolean;
+  pagination?: PaginationProps;
 }
 
 interface KanbanProps {
@@ -99,6 +109,9 @@ interface KanbanProps {
   setDraggingId: (id: number | null) => void;
   dragOverStatus: CrmStatus | null;
   setDragOverStatus: (s: CrmStatus | null) => void;
+  doneTotalCounts: Record<CrmStatus, number>;
+  kanbanDoneDays: 7 | 30 | null;
+  onKanbanDoneDaysChange: (v: 7 | 30 | null) => void;
 }
 
 function toIsoLocal(datetime: string | null) {
@@ -161,9 +174,15 @@ function CrmShell() {
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<CrmStatus | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [currentPage, setCurrentPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [kanbanDoneDays, setKanbanDoneDays] = useState<7 | 30 | null>(7);
   const [counselorOpen, setCounselorOpen] = useState(false);
   const [excelMenuOpen, setExcelMenuOpen] = useState(false);
   const [excelDownloading, setExcelDownloading] = useState(false);
@@ -174,6 +193,18 @@ function CrmShell() {
   const apiKey = process.env.NEXT_PUBLIC_API_KEY || "";
   const currentUser = process.env.NEXT_PUBLIC_USER_NAME || "상담원";
   const [pollTick, setPollTick] = useState(0);
+
+  // 리스트 뷰 검색 디바운스 (300ms)
+  useEffect(() => {
+    if (viewMode !== "list") return;
+    const t = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(t);
+  }, [searchTerm, viewMode]);
+
+  // 필터 변경 시 페이지 리셋
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [scope, includeDone, selectedUserId, sortOrder, dateFrom, dateTo, debouncedSearch, pageSize]);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -190,7 +221,6 @@ function CrmShell() {
     const qs = new URLSearchParams({
       scope,
       includeDone: String(includeDone),
-      limit: "100",
       sortOrder
     });
     if (selectedUserId) {
@@ -200,11 +230,31 @@ function CrmShell() {
     if (dateFrom) qs.set("from", dateFrom);
     if (dateTo) qs.set("to", dateTo);
 
+    if (viewMode === "list") {
+      // 리스트 뷰: 서버 사이드 페이지네이션
+      qs.set("page", String(currentPage));
+      qs.set("pageSize", String(pageSize));
+      if (debouncedSearch) qs.set("search", debouncedSearch);
+    } else {
+      // 칸반/캘린더: limit 방식
+      qs.set("limit", "300");
+    }
+
     const res = await fetch(`/api/crm/leads?${qs.toString()}`);
     const json = await res.json();
     if (!res.ok) throw new Error(json.message || "리드 조회 실패");
     setLeads((json.data || []) as Lead[]);
-  }, [scope, includeDone, selectedUserId, sortOrder, dateFrom, dateTo]);
+
+    // 페이지네이션 meta 저장
+    if (viewMode === "list" && json.meta) {
+      setTotalCount(json.meta.totalCount ?? 0);
+      setTotalPages(json.meta.totalPages ?? 1);
+      // 폴링 후 현재 페이지가 범위를 벗어나면 마지막 페이지로 이동
+      if (currentPage >= (json.meta.totalPages ?? 1) && (json.meta.totalPages ?? 1) > 0) {
+        setCurrentPage((json.meta.totalPages ?? 1) - 1);
+      }
+    }
+  }, [scope, includeDone, selectedUserId, sortOrder, dateFrom, dateTo, viewMode, currentPage, pageSize, debouncedSearch]);
 
   const fetchCalendar = useCallback(async () => {
     const qs = new URLSearchParams();
@@ -423,10 +473,12 @@ function CrmShell() {
   };
 
   const filteredLeads = useMemo(() => {
+    // 리스트 뷰는 서버 사이드 검색이므로 클라이언트 필터 스킵
+    if (viewMode === "list") return leads;
     if (!searchTerm) return leads;
     const t = searchTerm.toLowerCase();
     return leads.filter(l => l.name.toLowerCase().includes(t) || l.phone.includes(t));
-  }, [leads, searchTerm]);
+  }, [leads, searchTerm, viewMode]);
 
   const saveQuickMemo = async (leadId: number, body: string) => {
     const res = await fetch(`/api/crm/leads/${leadId}/memos`, {
@@ -446,10 +498,28 @@ function CrmShell() {
     pushToast("메모가 저장되었습니다.", "success");
   };
 
+  const DONE_STATUS_SET = useMemo(() => new Set<CrmStatus>(["응대중", "통화완료", "예약완료"]), []);
+
   const groupedLeads = useMemo(() => {
     const g: Record<CrmStatus, Lead[]> = { "신규인입": [], "1차부재": [], "2차부재": [], "3차부재": [], "노쇼": [], "응대중": [], "통화완료": [], "예약완료": [] };
-    filteredLeads.forEach(l => g[l.crmStatus].push(l));
+    const cutoff = kanbanDoneDays != null
+      ? new Date(Date.now() - kanbanDoneDays * 24 * 60 * 60 * 1000)
+      : null;
+    filteredLeads.forEach(l => {
+      if (DONE_STATUS_SET.has(l.crmStatus) && cutoff) {
+        if (new Date(l.createdAt) >= cutoff) g[l.crmStatus].push(l);
+      } else {
+        g[l.crmStatus].push(l);
+      }
+    });
     return g;
+  }, [filteredLeads, kanbanDoneDays, DONE_STATUS_SET]);
+
+  // DONE 전체 건수 (기간 필터 전)
+  const doneTotalCounts = useMemo(() => {
+    const counts: Record<CrmStatus, number> = { "신규인입": 0, "1차부재": 0, "2차부재": 0, "3차부재": 0, "노쇼": 0, "응대중": 0, "통화완료": 0, "예약완료": 0 };
+    filteredLeads.forEach(l => { counts[l.crmStatus]++; });
+    return counts;
   }, [filteredLeads]);
 
   const selectedLead = useMemo(() => leads.find(l => l.id === selectedLeadId) || null, [leads, selectedLeadId]);
@@ -511,12 +581,13 @@ function CrmShell() {
           <button className="p-3 text-slate-400 hover:text-primary"><span className="material-icons">people</span></button>
           <button className="p-3 text-slate-400 hover:text-primary"><span className="material-icons">chat</span></button>
         </nav>
-        <div className="mt-auto flex flex-col gap-4">
+        <div className="mt-auto flex flex-col gap-4 items-center">
           <button className="p-3 text-slate-400"><span className="material-icons">settings</span></button>
           <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="https://lh3.googleusercontent.com/a/default-user" alt="User" />
           </div>
+          <span className="text-[10px] text-slate-300">v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
         </div>
       </aside>
 
@@ -654,8 +725,8 @@ function CrmShell() {
         {/* Content Area */}
         <div className="flex-1 overflow-hidden p-2 md:p-6 relative" tabIndex={-1} ref={viewContainerRef}>
           {loading && !hasLoaded.current && <SkeletonOverlay viewMode={viewMode} />}
-          {(hasLoaded.current || !loading) && viewMode === "kanban" && <KanbanView grouped={groupedLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onSaveMemo={saveQuickMemo} draggingId={draggingId} setDraggingId={setDraggingId} dragOverStatus={dragOverStatus} setDragOverStatus={setDragOverStatus} />}
-          {(hasLoaded.current || !loading) && viewMode === "list" && <ListView leads={filteredLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} loading={loading} />}
+          {(hasLoaded.current || !loading) && viewMode === "kanban" && <KanbanView grouped={groupedLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onSaveMemo={saveQuickMemo} draggingId={draggingId} setDraggingId={setDraggingId} dragOverStatus={dragOverStatus} setDragOverStatus={setDragOverStatus} doneTotalCounts={doneTotalCounts} kanbanDoneDays={kanbanDoneDays} onKanbanDoneDaysChange={setKanbanDoneDays} />}
+          {(hasLoaded.current || !loading) && viewMode === "list" && <ListView leads={filteredLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} loading={loading} pagination={{ currentPage, pageSize, totalCount, totalPages, onPageChange: setCurrentPage, onPageSizeChange: setPageSize }} />}
           {(hasLoaded.current || !loading) && viewMode === "calendar" && <CalendarView events={calendarEvents} />}
         </div>
       </main>
@@ -688,15 +759,41 @@ function CrmShell() {
   );
 }
 
-function KanbanView({ grouped, users, onSelect, selectedId, onStatus, onSaveMemo, draggingId, setDraggingId, dragOverStatus, setDragOverStatus }: KanbanProps) {
+function KanbanView({ grouped, users, onSelect, selectedId, onStatus, onSaveMemo, draggingId, setDraggingId, dragOverStatus, setDragOverStatus, doneTotalCounts, kanbanDoneDays, onKanbanDoneDaysChange }: KanbanProps) {
+  const doneSet = new Set<CrmStatus>(["응대중", "통화완료", "예약완료"]);
   return (
     <div className="flex gap-2 h-full overflow-x-auto pb-4 items-start snap-x snap-mandatory md:gap-4 md:snap-none">
-      {statusOptions.map(status => (
+      {statusOptions.map(status => {
+        const isDone = doneSet.has(status);
+        return (
         <div key={status} onDragOver={(e) => { e.preventDefault(); setDragOverStatus(status); }} onDragLeave={() => setDragOverStatus(null)} onDrop={() => { if (!draggingId) return; setDragOverStatus(null); onStatus(draggingId, status); setDraggingId(null); }}
           className={`w-72 shrink-0 snap-center md:w-80 flex flex-col max-h-full rounded-xl border border-border bg-slate-100/40 transition-colors ${dragOverStatus === status ? "bg-primary/5 border-primary/40" : ""}`}
         >
           <div className="p-3 md:p-4 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${statusStyles[status].dot}`}></span><span className="font-bold text-sm text-slate-700">{status}</span><span className="bg-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm">{grouped[status].length}</span></div>
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${statusStyles[status].dot}`}></span>
+              <span className="font-bold text-sm text-slate-700">{status}</span>
+              <span className="bg-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm">
+                {isDone && kanbanDoneDays != null
+                  ? `${grouped[status].length}/${doneTotalCounts[status]}`
+                  : grouped[status].length}
+              </span>
+            </div>
+            {isDone && (
+              <select
+                value={kanbanDoneDays ?? "all"}
+                onChange={e => {
+                  const v = e.target.value;
+                  onKanbanDoneDaysChange(v === "all" ? null : Number(v) as 7 | 30);
+                }}
+                className="text-[10px] border-slate-200 rounded px-1 py-0.5 bg-white"
+                onClick={e => e.stopPropagation()}
+              >
+                <option value="7">7일</option>
+                <option value="30">30일</option>
+                <option value="all">전체</option>
+              </select>
+            )}
           </div>
           <div className="flex-1 overflow-y-auto px-2 space-y-2 pb-3 md:px-3 md:space-y-3 md:pb-4">
             {grouped[status].map((l) => (
@@ -704,7 +801,8 @@ function KanbanView({ grouped, users, onSelect, selectedId, onStatus, onSaveMemo
             ))}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -787,8 +885,25 @@ function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMe
   );
 }
 
-function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, onSchedule, loading }: ViewProps) {
+function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, onSchedule, loading, pagination }: ViewProps) {
   const stop = (e: React.MouseEvent | React.ChangeEvent) => e.stopPropagation();
+  const p = pagination;
+  const rowNum = (idx: number) => p ? p.currentPage * p.pageSize + idx + 1 : idx + 1;
+
+  // 페이지 번호 배열 생성 (현재 ±2, 처음/끝)
+  const pageNumbers = useMemo(() => {
+    if (!p || p.totalPages <= 1) return [];
+    const pages: (number | "...")[] = [];
+    const tp = p.totalPages;
+    const cur = p.currentPage;
+    const start = Math.max(0, cur - 2);
+    const end = Math.min(tp - 1, cur + 2);
+    if (start > 0) { pages.push(0); if (start > 1) pages.push("..."); }
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (end < tp - 1) { if (end < tp - 2) pages.push("..."); pages.push(tp - 1); }
+    return pages;
+  }, [p]);
+
   return (
     <div className="h-full flex flex-col bg-card border border-border rounded-xl shadow-sm overflow-hidden">
       {/* Mobile card list */}
@@ -799,7 +914,7 @@ function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, on
           {leads.map((l, idx) => (
             <div key={l.id} onClick={() => onSelect(l.id)} className={`p-3 cursor-pointer transition-colors ${selectedId === l.id ? "bg-blue-50/50" : ""}`}>
               <div className="flex justify-between items-start mb-2">
-                <div className="flex items-start gap-2"><span className="text-[11px] font-semibold text-slate-400 mt-0.5 min-w-[1.2rem]">{idx + 1}</span><div><div className="font-bold text-sm text-slate-900">{l.name}</div><PhoneLink phone={l.phone} className="text-xs text-slate-500" /></div></div>
+                <div className="flex items-start gap-2"><span className="text-[11px] font-semibold text-slate-400 mt-0.5 min-w-[1.2rem]">{rowNum(idx)}</span><div><div className="font-bold text-sm text-slate-900">{l.name}</div><PhoneLink phone={l.phone} className="text-xs text-slate-500" /></div></div>
                 <div className="text-[10px] text-slate-400 whitespace-nowrap">유입 {fmtCreatedAt(l.createdAt)}</div>
               </div>
               <div className="flex flex-wrap gap-1 mb-2">
@@ -839,7 +954,7 @@ function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, on
           <tbody className="divide-y divide-slate-100">
             {leads.map((l, idx) => (
               <tr key={l.id} onClick={() => onSelect(l.id)} className={`hover:bg-slate-50 cursor-pointer transition-colors ${selectedId === l.id ? "bg-blue-50/50" : ""}`}>
-                <td className="px-4 py-3 text-center text-xs text-slate-400 font-semibold">{idx + 1}</td>
+                <td className="px-4 py-3 text-center text-xs text-slate-400 font-semibold">{rowNum(idx)}</td>
                 <td className="px-6 py-3"><div className="flex items-center gap-2"><div><div className="font-bold text-slate-900">{l.name}</div><PhoneLink phone={l.phone} className="text-[10px] text-slate-500" /></div></div></td>
                 <td className="px-6 py-3 text-xs text-slate-500">{fmtCreatedAt(l.createdAt)}</td>
                 <td className="px-6 py-3">
@@ -867,11 +982,60 @@ function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, on
               </tr>
             ))}
             {leads.length === 0 && !loading && (
-              <tr><td colSpan={6} className="py-20 text-center text-slate-400">조회된 데이터가 없습니다.</td></tr>
+              <tr><td colSpan={7} className="py-20 text-center text-slate-400">조회된 데이터가 없습니다.</td></tr>
             )}
           </tbody>
         </table>
       </div>
+      {/* Pagination bar */}
+      {p && p.totalPages > 0 && (
+        <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-slate-50 shrink-0 text-xs">
+          <span className="text-slate-500 font-medium">총 {p.totalCount.toLocaleString()}건</span>
+          <div className="flex items-center gap-1">
+            <button
+              disabled={p.currentPage === 0}
+              onClick={() => p.onPageChange(p.currentPage - 1)}
+              className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span className="material-icons text-sm">chevron_left</span>
+            </button>
+            {pageNumbers.map((n, i) =>
+              n === "..." ? (
+                <span key={`dots-${i}`} className="px-1 text-slate-400">...</span>
+              ) : (
+                <button
+                  key={n}
+                  onClick={() => p.onPageChange(n as number)}
+                  className={`min-w-[28px] px-2 py-1 rounded border text-center ${
+                    p.currentPage === n
+                      ? "bg-primary text-white border-primary font-bold"
+                      : "border-slate-200 bg-white hover:bg-slate-50"
+                  }`}
+                >
+                  {(n as number) + 1}
+                </button>
+              )
+            )}
+            <button
+              disabled={p.currentPage >= p.totalPages - 1}
+              onClick={() => p.onPageChange(p.currentPage + 1)}
+              className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span className="material-icons text-sm">chevron_right</span>
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={p.pageSize}
+              onChange={e => p.onPageSizeChange(Number(e.target.value))}
+              className="border-slate-200 rounded px-2 py-1 bg-white text-xs"
+            >
+              <option value={20}>20건</option>
+              <option value={50}>50건</option>
+            </select>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
