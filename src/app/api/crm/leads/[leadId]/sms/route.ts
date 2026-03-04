@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { leads, smsLogs, leadMemos } from "@/lib/schema";
+import { leads, smsLogs } from "@/lib/schema";
 import { sendSms } from "@/lib/sms";
 import { z } from "zod";
 
@@ -71,15 +71,6 @@ export async function POST(request: NextRequest, { params }: Params) {
         errorMessage: !isSuccess ? result.message : null,
       })
       .returning();
-
-    // system 메모 자동 기록
-    const memoBody = `[SMS ${isTestMode ? "테스트" : "발송"}] ${status === "test" ? "(테스트모드)" : status === "sent" ? "발송 완료" : "발송 실패"}\n수신: ${lead.phone}\n내용: ${parsed.data.msg.slice(0, 100)}${parsed.data.msg.length > 100 ? "..." : ""}`;
-
-    await db.insert(leadMemos).values({
-      leadId: id,
-      authorName: `[시스템] ${parsed.data.senderName}`,
-      body: memoBody,
-    });
 
     return NextResponse.json({
       code: isSuccess || isTestMode ? 200 : 500,
