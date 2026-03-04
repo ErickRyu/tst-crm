@@ -2,20 +2,45 @@
   "permissions": {
     "allow": [
       "WebSearch",
+
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git fetch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git switch:*)",
+      "Bash(git stash:*)",
+      "Bash(git merge:*)",
+      "Bash(git rebase:*)",
+      "Bash(git worktree:*)",
+      "Bash(git cherry-pick:*)",
+      "Bash(git restore:*)",
+      "Bash(git remote:*)",
+      "Bash(git tag:*)",
+
       "Bash(npm install:*)",
-      "Bash(git init:*)",
-      "Bash(npx tsc:*)",
-      "Bash(npx next lint)",
+      "Bash(npm run:*)",
       "Bash(npx next build)",
+      "Bash(npx next lint)",
+      "Bash(npx next dev:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npx drizzle-kit:*)",
+      "Bash(npx shadcn@latest:*)",
+
+      "Bash(node:*)",
       "Bash(curl:*)",
-      "Bash(API_KEY=\"eb0c520cf5412fb14a249b63e94be53ed2b90baeddb76dc1ed6b3c6eb3167f6a\")",
-      "Bash(find:*)",
-      "Bash(ls:*)",
-      "WebFetch(domain:www.dentweb.co.kr)",
-      "mcp__stitch__list_projects",
-      "WebFetch(domain:github.com)",
       "Bash(sqlite3:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(touch:*)",
+
+      "WebFetch(domain:www.dentweb.co.kr)",
+      "WebFetch(domain:github.com)",
       "WebFetch(domain:vibekanban.com)",
+
+      "mcp__stitch__list_projects",
       "mcp__vibe_kanban__list_tags",
       "mcp__vibe_kanban__create_issue",
       "mcp__vibe_kanban__list_issues",
@@ -23,10 +48,10 @@
       "mcp__vibe_kanban__create_issue_relationship",
       "mcp__vibe_kanban__get_issue",
       "mcp__vibe_kanban__update_issue",
-      "Bash(tail:*)",
       "mcp__vibe_kanban__list_projects",
       "mcp__vibe_kanban__list_organizations",
-      "Bash(npx shadcn@latest:*)"
+
+      "Skill(commit-commands:commit)"
     ]
   }
 }

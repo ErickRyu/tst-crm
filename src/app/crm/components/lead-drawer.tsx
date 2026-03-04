@@ -8,7 +8,6 @@ import { ActivityTimeline } from "./activity-timeline";
 import { TagChip } from "./tag-chip";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
@@ -37,7 +36,6 @@ interface LeadDrawerProps {
   memoLoading: boolean;
   smsTemplates: SmsTemplate[];
   smsSending: boolean;
-  smsTestMode: boolean;
   onSendSms: (msg: string, templateKey?: string) => void;
   activities: ActivityItem[];
   activitiesLoading: boolean;
@@ -61,14 +59,12 @@ export function LeadDrawer({
   memoLoading,
   smsTemplates,
   smsSending,
-  smsTestMode,
   onSendSms,
   activities,
   activitiesLoading,
 }: LeadDrawerProps) {
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   const [smsMsg, setSmsMsg] = useState("");
-  const [smsWithMemo, setSmsWithMemo] = useState(false);
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const [washing, setWashing] = useState(false);
 
@@ -103,9 +99,6 @@ export function LeadDrawer({
   const handleSendSms = () => {
     if (!smsMsg.trim()) return;
     onSendSms(smsMsg.trim());
-    if (smsWithMemo && smsMsg.trim()) {
-      onMemoInput(`[SMS 발송] ${smsMsg.trim()}`);
-    }
     setSmsMsg("");
   };
 
@@ -265,7 +258,7 @@ export function LeadDrawer({
                     onChange={(e) => setSmsMsg(e.target.value)}
                     maxLength={2000}
                     rows={4}
-                    className="bg-slate-50 border-none pr-12 text-sm resize-none"
+                    className="bg-slate-50 border-none pr-12 text-sm resize-none [field-sizing:fixed]"
                     placeholder="메시지를 입력하세요... (전송: Enter)"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
@@ -286,18 +279,6 @@ export function LeadDrawer({
                     >
                       <span className="material-icons text-[14px]">bolt</span> 빠른 답변
                     </button>
-                    <div className="flex items-center gap-1.5 ml-2">
-                      <Checkbox
-                        checked={smsWithMemo}
-                        onCheckedChange={(checked) => setSmsWithMemo(checked === true)}
-                        id="sms-memo-sync"
-                        className="h-3.5 w-3.5"
-                      />
-                      <label htmlFor="sms-memo-sync" className="text-xs text-slate-500 cursor-pointer">SMS 동시 전송</label>
-                    </div>
-                    {smsTestMode && (
-                      <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">TEST</span>
-                    )}
                   </div>
                   <Button
                     size="sm"

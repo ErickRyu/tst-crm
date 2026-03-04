@@ -36,7 +36,6 @@ export function CrmShell() {
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [smsTemplates, setSmsTemplates] = useState<SmsTemplate[]>([]);
   const [smsSending, setSmsSending] = useState(false);
-  const [smsTestMode, setSmsTestMode] = useState(true);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<CrmStatus | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -163,7 +162,6 @@ export function CrmShell() {
       const res = await fetch("/api/crm/sms/templates");
       const json = await res.json();
       setSmsTemplates((json.data || []) as SmsTemplate[]);
-      setSmsTestMode(json.meta?.testMode ?? true);
     } catch {
       /* templates are non-critical */
     }
@@ -575,7 +573,6 @@ export function CrmShell() {
         onSaveMemo={() => selectedLeadId && saveMemo(selectedLeadId)}
         smsTemplates={smsTemplates}
         smsSending={smsSending}
-        smsTestMode={smsTestMode}
         onSendSms={(msg, templateKey) => selectedLeadId && sendSms(selectedLeadId, msg, templateKey)}
         activities={activities}
         activitiesLoading={activitiesLoading}
