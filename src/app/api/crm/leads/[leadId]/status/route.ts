@@ -6,6 +6,7 @@ import { canTransition, CrmStatus } from "@/lib/crm";
 import { crmStatusUpdateSchema } from "@/lib/validation";
 import { executeAutoSend } from "@/lib/auto-send";
 import { logActivity } from "@/lib/activity-log";
+import { notifyStatusChange } from "@/lib/telegram";
 
 type Params = { params: Promise<{ leadId: string }> };
 
@@ -93,6 +94,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       oldValue: from,
       newValue: to,
       detail: `상태 변경: ${from} → ${to}`,
+    }).catch(console.error);
+
+    // Fire-and-forget: Telegram notification for status change
+    notifyStatusChange({
+      leadId: id,
+      leadName: updated.name,
+      from,
+      to,
+      actorName: parsed.data.actorName || "시스템",
     }).catch(console.error);
 
     // Fire-and-forget: auto-send for absent statuses

@@ -4,6 +4,7 @@ import { leads } from "@/lib/schema";
 import { leadCreateSchema } from "@/lib/validation";
 import { eq, and, sql, gte, lt, SQL } from "drizzle-orm";
 import { executeAutoSend } from "@/lib/auto-send";
+import { notifyNewLead } from "@/lib/telegram";
 
 export async function POST(request: NextRequest) {
   try {
@@ -78,6 +79,16 @@ export async function POST(request: NextRequest) {
       category: created.category,
       assigneeId: created.assigneeId,
       appointmentAt: created.appointmentAt,
+    }).catch(console.error);
+
+    // Fire-and-forget: Telegram notification for new lead
+    notifyNewLead({
+      id: created.id,
+      name: created.name,
+      phone: created.phone,
+      category: created.category,
+      site: created.site,
+      createdAt: created.createdAt,
     }).catch(console.error);
 
     return NextResponse.json(
