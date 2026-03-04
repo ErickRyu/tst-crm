@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { leads } from "@/lib/schema";
 import { canTransition, CrmStatus } from "@/lib/crm";
 import { crmStatusUpdateSchema } from "@/lib/validation";
+import { executeAutoSend } from "@/lib/auto-send";
 
 type Params = { params: Promise<{ leadId: string }> };
 
@@ -81,6 +82,19 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         { code: 409, message: "다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요." },
         { status: 409 }
       );
+    }
+
+    // Fire-and-forget: auto-send for absent statuses
+    const absentStatuses = ["1차부재", "2차부재", "3차부재"];
+    if (absentStatuses.includes(to)) {
+      executeAutoSend("status_absent", to, {
+        leadId: updated.id,
+        name: updated.name,
+        phone: updated.phone,
+        category: updated.category,
+        assigneeId: updated.assigneeId,
+        appointmentAt: updated.appointmentAt,
+      }).catch(console.error);
     }
 
     return NextResponse.json(

@@ -79,11 +79,13 @@ export interface LeadMemo {
 }
 
 export interface SmsTemplate {
+  id?: number;
   key: string;
   label: string;
   icon: string;
   body: string;
   msgType: "SMS" | "LMS";
+  category?: string;
   statuses?: string[];
 }
 

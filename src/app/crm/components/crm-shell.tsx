@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useLoading } from "../ui/loading-overlay";
 import type { ViewMode, Scope, CrmStatus, Lead, User, CalendarEvent, LeadMemo, SmsTemplate } from "../types";
@@ -14,6 +15,7 @@ import { PrimaryBar } from "./primary-bar";
 import { FilterPanel } from "./filter-panel";
 
 export function CrmShell() {
+  const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [scope, setScope] = useState<Scope>("all");
   const [users, setUsers] = useState<User[]>([]);
@@ -457,7 +459,7 @@ export function CrmShell() {
           <button className="p-3 text-slate-400 hover:text-primary"><span className="material-icons">chat</span></button>
         </nav>
         <div className="mt-auto flex flex-col gap-4 items-center">
-          <button className="p-3 text-slate-400"><span className="material-icons">settings</span></button>
+          <button className="p-3 text-slate-400 hover:text-primary" onClick={() => router.push("/crm/settings")}><span className="material-icons">settings</span></button>
           <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="https://lh3.googleusercontent.com/a/default-user" alt="User" />

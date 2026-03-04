@@ -3,6 +3,7 @@ import { eq, and, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { leads } from "@/lib/schema";
 import { crmScheduleUpdateSchema } from "@/lib/validation";
+import { executeAutoSend } from "@/lib/auto-send";
 
 type Params = { params: Promise<{ leadId: string }> };
 
@@ -46,7 +47,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       updates.followUpAt = parseDateTime(parsed.data.followUpAt ?? null);
     }
 
-    if (Object.prototype.hasOwnProperty.call(parsed.data, "appointmentAt")) {
+    const settingAppointment = Object.prototype.hasOwnProperty.call(parsed.data, "appointmentAt");
+    if (settingAppointment) {
       updates.appointmentAt = parseDateTime(parsed.data.appointmentAt ?? null);
     }
 
@@ -55,6 +57,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         { code: 400, message: "변경할 일정 필드가 없습니다." },
         { status: 400 }
       );
+    }
+
+    // Check previous state for appointment trigger
+    let prevAppointmentAt: Date | null = null;
+    if (settingAppointment && updates.appointmentAt) {
+      const [prev] = await db
+        .select({ appointmentAt: leads.appointmentAt })
+        .from(leads)
+        .where(eq(leads.id, id))
+        .limit(1);
+      prevAppointmentAt = prev?.appointmentAt ?? null;
     }
 
     const where = parsed.data.version
@@ -75,6 +88,18 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         { code: 409, message: "다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요." },
         { status: 409 }
       );
+    }
+
+    // Fire-and-forget: auto-send for appointment_set (null → non-null)
+    if (settingAppointment && updates.appointmentAt && !prevAppointmentAt) {
+      executeAutoSend("appointment_set", null, {
+        leadId: updated.id,
+        name: updated.name,
+        phone: updated.phone,
+        category: updated.category,
+        assigneeId: updated.assigneeId,
+        appointmentAt: updated.appointmentAt,
+      }).catch(console.error);
     }
 
     return NextResponse.json({

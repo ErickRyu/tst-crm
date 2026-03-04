@@ -109,3 +109,48 @@ export const memoUpdateSchema = z.object({
 export const crmUserCreateSchema = z.object({
   name: z.string().min(1, "상담원 이름은 필수입니다."),
 });
+
+// --- SMS Template schemas ---
+export const smsTemplateCreateSchema = z.object({
+  key: z.string().min(1).max(50),
+  label: z.string().min(1).max(100),
+  icon: z.string().min(1).max(50),
+  body: z.string().min(1).max(2000),
+  msgType: z.enum(["SMS", "LMS"]),
+  category: z.string().max(50).nullable().optional(),
+  statuses: z.array(z.string()).nullable().optional(),
+});
+
+export const smsTemplateUpdateSchema = z.object({
+  label: z.string().min(1).max(100).optional(),
+  icon: z.string().min(1).max(50).optional(),
+  body: z.string().min(1).max(2000).optional(),
+  msgType: z.enum(["SMS", "LMS"]).optional(),
+  category: z.string().max(50).nullable().optional(),
+  statuses: z.array(z.string()).nullable().optional(),
+});
+
+// --- Auto-send rule schemas ---
+export const autoSendRuleCreateSchema = z.object({
+  triggerType: z.enum(["new_lead", "appointment_set", "status_absent"]),
+  triggerValue: z.string().nullable().optional(),
+  templateId: z.number().int().positive(),
+  isEnabled: z.boolean().optional(),
+});
+
+export const autoSendRuleUpdateSchema = z.object({
+  triggerType: z.enum(["new_lead", "appointment_set", "status_absent"]).optional(),
+  triggerValue: z.string().nullable().optional(),
+  templateId: z.number().int().positive().optional(),
+  isEnabled: z.boolean().optional(),
+});
+
+// --- CRM Settings schemas ---
+export const crmSettingsUpdateSchema = z.record(z.string(), z.string());
+
+// --- User phone update ---
+export const crmUserUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  phone: z.string().nullable().optional(),
+  isActive: z.number().int().min(0).max(1).optional(),
+});

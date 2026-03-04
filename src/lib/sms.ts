@@ -122,10 +122,12 @@ export async function sendSms(params: {
     throw new Error("발신번호(ALIGO_SENDER)가 설정되지 않았습니다.");
   }
 
-  // %고객명% 치환
+  // {고객명} and %고객명% 치환
   let msg = params.msg;
   if (params.patientName) {
     msg = msg.replace(/%고객명%/g, params.patientName);
+    msg = msg.replace(/\{고객명\}/g, params.patientName);
+    msg = msg.replace(/\{고객이름\}/g, params.patientName);
   }
 
   // 90바이트(한글 45자) 초과시 자동 LMS 전환

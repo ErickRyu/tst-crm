@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { leads } from "@/lib/schema";
 import { leadCreateSchema } from "@/lib/validation";
 import { eq, and, sql, gte, lt, SQL } from "drizzle-orm";
+import { executeAutoSend } from "@/lib/auto-send";
 
 export async function POST(request: NextRequest) {
   try {
@@ -68,6 +69,16 @@ export async function POST(request: NextRequest) {
         ip,
       })
       .returning();
+
+    // Fire-and-forget: auto-send SMS for new lead
+    executeAutoSend("new_lead", null, {
+      leadId: created.id,
+      name: created.name,
+      phone: created.phone,
+      category: created.category,
+      assigneeId: created.assigneeId,
+      appointmentAt: created.appointmentAt,
+    }).catch(console.error);
 
     return NextResponse.json(
       { code: 201, message: "리드가 등록되었습니다.", data: created },

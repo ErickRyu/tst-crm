@@ -3,6 +3,7 @@ import { pgTable, serial, text, integer, timestamp, date, primaryKey } from "dri
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  phone: text("phone"),
   isActive: integer("is_active").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -69,5 +70,37 @@ export const smsLogs = pgTable("sms_logs", {
   senderName: text("sender_name").notNull(),
   msgId: text("msg_id"), // Aligo response msg_id
   errorMessage: text("error_message"),
+  isAutoSend: integer("is_auto_send").default(0),
+  autoSendRuleId: integer("auto_send_rule_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const smsTemplates = pgTable("sms_templates", {
+  id: serial("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  label: text("label").notNull(),
+  icon: text("icon").notNull(),
+  body: text("body").notNull(),
+  msgType: text("msg_type").notNull(), // SMS, LMS
+  category: text("category"),
+  statuses: text("statuses"), // JSON string array
+  isActive: integer("is_active").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const autoSendRules = pgTable("auto_send_rules", {
+  id: serial("id").primaryKey(),
+  triggerType: text("trigger_type").notNull(), // "new_lead" | "appointment_set" | "status_absent"
+  triggerValue: text("trigger_value"), // e.g. "1차부재"
+  templateId: integer("template_id").notNull().references(() => smsTemplates.id),
+  isEnabled: integer("is_enabled").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const crmSettings = pgTable("crm_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

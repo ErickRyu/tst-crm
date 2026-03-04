@@ -105,7 +105,23 @@ export function LeadDrawer({
   };
 
   const handleTemplateSelect = (tpl: SmsTemplate) => {
-    const msg = lead ? tpl.body.replace(/%고객명%/g, lead.name) : tpl.body;
+    if (!lead) { setSmsMsg(tpl.body); setQuickMenuOpen(false); return; }
+    let msg = tpl.body;
+    // {고객명} and legacy %고객명% replacement
+    msg = msg.replace(/\{고객명\}/g, lead.name);
+    msg = msg.replace(/\{고객이름\}/g, lead.name);
+    msg = msg.replace(/%고객명%/g, lead.name);
+    // {예약확정일시}
+    if (lead.appointmentAt) {
+      const d = new Date(lead.appointmentAt);
+      if (!isNaN(d.getTime())) {
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const formatted = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        msg = msg.replace(/\{예약확정일시\}/g, formatted);
+      }
+    }
+    // {문의내용}
+    msg = msg.replace(/\{문의내용\}/g, lead.category || "");
     setSmsMsg(msg);
     setQuickMenuOpen(false);
   };
