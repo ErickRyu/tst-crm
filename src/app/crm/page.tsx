@@ -183,7 +183,7 @@ function CrmShell() {
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [kanbanDoneDays, setKanbanDoneDays] = useState<7 | 30 | null>(7);
-  const [counselorOpen, setCounselorOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [excelMenuOpen, setExcelMenuOpen] = useState(false);
   const [excelDownloading, setExcelDownloading] = useState(false);
   const hasLoaded = useRef(false);
@@ -193,6 +193,24 @@ function CrmShell() {
   const apiKey = process.env.NEXT_PUBLIC_API_KEY || "";
   const currentUser = process.env.NEXT_PUBLIC_USER_NAME || "상담원";
   const [pollTick, setPollTick] = useState(0);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (scope !== "all") count++;
+    if (dateFrom || dateTo) count++;
+    if (sortOrder !== "desc") count++;
+    if (includeDone) count++;
+    return count;
+  }, [scope, dateFrom, dateTo, sortOrder, includeDone]);
+
+  const resetFilters = useCallback(() => {
+    setScope("all");
+    setSelectedUserId(null);
+    setIncludeDone(false);
+    setSortOrder("desc");
+    setDateFrom("");
+    setDateTo("");
+  }, []);
 
   // 리스트 뷰 검색 디바운스 (300ms)
   useEffect(() => {
@@ -592,135 +610,158 @@ function CrmShell() {
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Header */}
-        <header className="flex flex-col gap-2 px-3 py-2 md:h-16 md:flex-row md:items-center md:justify-between md:px-6 md:py-0 bg-card border-b border-border shrink-0">
-          <div className="flex items-center gap-2 flex-wrap md:gap-6 md:flex-nowrap">
-            <h1 className="text-base md:text-xl font-bold">접수 현황</h1>
-            <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
-              <button aria-pressed={viewMode === "kanban"} onClick={() => setViewMode("kanban")} disabled={loading} className={`px-2 py-1 text-[10px] md:px-3 md:py-1.5 md:text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "kanban" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">view_kanban</span> 칸반</button>
-              <button aria-pressed={viewMode === "list"} onClick={() => setViewMode("list")} disabled={loading} className={`px-2 py-1 text-[10px] md:px-3 md:py-1.5 md:text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">view_list</span> 리스트</button>
-              <button aria-pressed={viewMode === "calendar"} onClick={() => setViewMode("calendar")} disabled={loading} className={`px-2 py-1 text-[10px] md:px-3 md:py-1.5 md:text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "calendar" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">calendar_today</span> 캘린더</button>
-            </div>
-            
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg shrink-0 ml-0 md:ml-2">
-              <button onClick={() => { setScope("all"); setSelectedUserId(null); }} className={`px-3 py-1.5 text-[11px] font-bold rounded transition-all ${scope === "all" ? "bg-primary text-white" : "text-slate-500"}`}>전체보기</button>
-              <button onClick={() => { setScope("mine"); if (users.length > 0 && !selectedUserId) setSelectedUserId(users[0].id); }} className={`px-3 py-1.5 text-[11px] font-bold rounded transition-all ${scope === "mine" ? "bg-primary text-white" : "text-slate-500"}`}>내 할당</button>
-            </div>
-
-            <label className="flex items-center gap-2 cursor-pointer ml-0 md:ml-4">
-              <input type="checkbox" checked={includeDone} onChange={e => setIncludeDone(e.target.checked)} className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4" />
-              <span className="text-[11px] font-bold text-slate-500">완료 항목 포함</span>
-            </label>
-
-            <button onClick={() => setSortOrder(s => s === "desc" ? "asc" : "desc")} className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold text-slate-500 hover:bg-slate-100 transition-colors">
-              <span className="material-icons text-sm">swap_vert</span>
-              <span>{sortOrder === "desc" ? "최신순" : "오래된순"}</span>
-            </button>
-
-            {/* 날짜 필터 */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg shrink-0 ml-0 md:ml-2">
-              {([
-                ["전체", "", ""],
-                ["오늘", 0, 0],
-                ["7일", 7, 0],
-                ["30일", 30, 0],
-              ] as [string, number | "", number | ""][]).map(([label, daysBack]) => {
-                const isActive = daysBack === ""
-                  ? !dateFrom && !dateTo
-                  : (() => {
-                      const d = new Date();
-                      d.setDate(d.getDate() - (daysBack as number));
-                      const pad = (n: number) => String(n).padStart(2, "0");
-                      const expected = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-                      const today = new Date();
-                      const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-                      return dateFrom === expected && dateTo === todayStr;
-                    })();
-                return (
-                  <button
-                    key={label}
-                    onClick={() => {
-                      if (daysBack === "") {
-                        setDateFrom("");
-                        setDateTo("");
-                      } else {
-                        const d = new Date();
-                        const pad = (n: number) => String(n).padStart(2, "0");
-                        const todayStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-                        d.setDate(d.getDate() - (daysBack as number));
-                        const fromStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-                        setDateFrom(fromStr);
-                        setDateTo(todayStr);
-                      }
-                    }}
-                    className={`px-2 py-1 text-[10px] md:px-3 md:py-1.5 md:text-xs font-medium rounded transition-all ${isActive ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex items-center gap-1 shrink-0 ml-0 md:ml-1">
-              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="bg-slate-100 border-none rounded-lg px-2 py-1 text-[11px] md:text-xs focus:ring-2 focus:ring-primary/20" />
-              <span className="text-slate-400 text-xs">~</span>
-              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="bg-slate-100 border-none rounded-lg px-2 py-1 text-[11px] md:text-xs focus:ring-2 focus:ring-primary/20" />
-            </div>
+        {/* Zone A: Primary Bar */}
+        <header className="flex items-center gap-2 px-3 py-2 md:px-6 bg-card border-b border-border shrink-0">
+          <h1 className="text-base md:text-xl font-bold shrink-0">접수 현황</h1>
+          <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
+            <button aria-pressed={viewMode === "kanban"} onClick={() => setViewMode("kanban")} disabled={loading} className={`px-2 py-1 text-[10px] md:px-3 md:py-1.5 md:text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "kanban" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">view_kanban</span><span className="hidden sm:inline"> 칸반</span></button>
+            <button aria-pressed={viewMode === "list"} onClick={() => setViewMode("list")} disabled={loading} className={`px-2 py-1 text-[10px] md:px-3 md:py-1.5 md:text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">view_list</span><span className="hidden sm:inline"> 리스트</span></button>
+            <button aria-pressed={viewMode === "calendar"} onClick={() => setViewMode("calendar")} disabled={loading} className={`px-2 py-1 text-[10px] md:px-3 md:py-1.5 md:text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "calendar" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">calendar_today</span><span className="hidden sm:inline"> 캘린더</span></button>
           </div>
-
-          <div className="flex items-center flex-wrap gap-2 w-full md:w-auto md:flex-nowrap md:gap-4">
-            <div className="relative flex-1 min-w-0 md:flex-none"><span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">search</span><input ref={searchInputRef} type="text" placeholder="환자명, 전화번호..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-64 bg-slate-100 border-none rounded-lg py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary/20" /></div>
-            {/* Desktop: native select */}
-            <select value={selectedUserId || ""} onChange={(e) => { const v = e.target.value ? Number(e.target.value) : null; setSelectedUserId(v); if(v) setScope("mine"); }} className="hidden md:block shrink-0 bg-card border border-border rounded-lg px-3 py-2 text-sm font-medium">
-              <option value="">전체 상담원</option>
-              {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-            {/* Mobile: custom dropdown */}
-            <div className="relative shrink-0 md:hidden">
-              <button onClick={() => setCounselorOpen(!counselorOpen)} className="flex items-center gap-1 bg-card border border-border rounded-lg px-3 py-2 text-sm font-medium">
-                {selectedUserId ? users.find(u => u.id === selectedUserId)?.name ?? "상담원" : "전체 상담원"}
-                <span className="material-icons text-sm">{counselorOpen ? "expand_less" : "expand_more"}</span>
-              </button>
-              {counselorOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setCounselorOpen(false)} />
-                  <div className="absolute top-full right-0 mt-1 bg-white border border-border rounded-lg shadow-xl z-50 min-w-[140px] py-1 max-h-60 overflow-y-auto">
-                    <button onClick={() => { setSelectedUserId(null); setCounselorOpen(false); }} className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${!selectedUserId ? "text-primary font-bold" : ""}`}>전체 상담원</button>
-                    {users.map(u => (
-                      <button key={u.id} onClick={() => { setSelectedUserId(u.id); setScope("mine"); setCounselorOpen(false); }} className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${selectedUserId === u.id ? "text-primary font-bold" : ""}`}>{u.name}</button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="hidden md:flex"><Legend /></div>
-            {/* 엑셀 다운로드 */}
-            <div className="relative shrink-0">
-              <button
-                onClick={() => setExcelMenuOpen(!excelMenuOpen)}
-                disabled={excelDownloading}
-                className={`flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-3 py-2 text-xs font-medium transition-colors ${excelDownloading ? "opacity-60 cursor-not-allowed" : ""}`}
-              >
-                <span className="material-icons text-sm">{excelDownloading ? "hourglass_empty" : "download"}</span>
-                <span className="hidden sm:inline">{excelDownloading ? "다운로드 중..." : "엑셀"}</span>
-              </button>
-              {excelMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setExcelMenuOpen(false)} />
-                  <div className="absolute top-full right-0 mt-1 bg-white border border-border rounded-lg shadow-xl z-50 min-w-[180px] py-1">
-                    <button onClick={() => downloadExcel(false)} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
-                      <span className="material-icons text-sm text-emerald-600">filter_alt</span>
-                      현재 필터 다운로드
-                    </button>
-                    <button onClick={() => downloadExcel(true)} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
-                      <span className="material-icons text-sm text-blue-600">select_all</span>
-                      전체 리스트 (Archive 포함)
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+          <div className="flex-1" />
+          <div className="relative flex-1 min-w-0 max-w-xs">
+            <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">search</span>
+            <input ref={searchInputRef} type="text" placeholder="환자명, 전화번호..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary/20" />
+          </div>
+          <button
+            onClick={() => setFiltersOpen(v => !v)}
+            className={`relative flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors shrink-0 ${filtersOpen ? "bg-primary text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+          >
+            <span className="material-icons text-sm">tune</span>
+            <span className="hidden sm:inline">필터</span>
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{activeFilterCount}</span>
+            )}
+          </button>
+          {/* 엑셀 다운로드 */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setExcelMenuOpen(!excelMenuOpen)}
+              disabled={excelDownloading}
+              className={`flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-3 py-2 text-xs font-medium transition-colors ${excelDownloading ? "opacity-60 cursor-not-allowed" : ""}`}
+            >
+              <span className="material-icons text-sm">{excelDownloading ? "hourglass_empty" : "download"}</span>
+              <span className="hidden sm:inline">{excelDownloading ? "다운로드 중..." : "엑셀"}</span>
+            </button>
+            {excelMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setExcelMenuOpen(false)} />
+                <div className="absolute top-full right-0 mt-1 bg-white border border-border rounded-lg shadow-xl z-50 min-w-[180px] py-1">
+                  <button onClick={() => downloadExcel(false)} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
+                    <span className="material-icons text-sm text-emerald-600">filter_alt</span>
+                    현재 필터 다운로드
+                  </button>
+                  <button onClick={() => downloadExcel(true)} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
+                    <span className="material-icons text-sm text-blue-600">select_all</span>
+                    전체 리스트 (Archive 포함)
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </header>
+
+        {/* Zone B: Filter Panel (collapsible) */}
+        <div className={`overflow-hidden transition-all duration-200 ease-in-out bg-card border-b border-border ${filtersOpen ? "max-h-[300px] opacity-100" : "max-h-0 opacity-0 border-b-0"}`}>
+          <div className="flex flex-col gap-3 px-3 py-3 md:flex-row md:items-start md:gap-6 md:px-6">
+            {/* 범위 */}
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] text-slate-400 font-medium">범위</span>
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+                <button onClick={() => { setScope("all"); setSelectedUserId(null); }} className={`px-3 py-1.5 text-[11px] font-bold rounded transition-all ${scope === "all" ? "bg-primary text-white" : "text-slate-500"}`}>전체보기</button>
+                <button onClick={() => { setScope("mine"); if (users.length > 0 && !selectedUserId) setSelectedUserId(users[0].id); }} className={`px-3 py-1.5 text-[11px] font-bold rounded transition-all ${scope === "mine" ? "bg-primary text-white" : "text-slate-500"}`}>내 할당</button>
+              </div>
+            </div>
+
+            {/* 구분선 (데스크탑) */}
+            <div className="hidden md:block w-px h-12 bg-slate-200 self-center" />
+
+            {/* 기간 */}
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] text-slate-400 font-medium">기간</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+                  {([
+                    ["전체", "", ""],
+                    ["오늘", 0, 0],
+                    ["7일", 7, 0],
+                    ["30일", 30, 0],
+                  ] as [string, number | "", number | ""][]).map(([label, daysBack]) => {
+                    const isActive = daysBack === ""
+                      ? !dateFrom && !dateTo
+                      : (() => {
+                          const d = new Date();
+                          d.setDate(d.getDate() - (daysBack as number));
+                          const pad = (n: number) => String(n).padStart(2, "0");
+                          const expected = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+                          const today = new Date();
+                          const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+                          return dateFrom === expected && dateTo === todayStr;
+                        })();
+                    return (
+                      <button
+                        key={label}
+                        onClick={() => {
+                          if (daysBack === "") {
+                            setDateFrom("");
+                            setDateTo("");
+                          } else {
+                            const d = new Date();
+                            const pad = (n: number) => String(n).padStart(2, "0");
+                            const todayStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+                            d.setDate(d.getDate() - (daysBack as number));
+                            const fromStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+                            setDateFrom(fromStr);
+                            setDateTo(todayStr);
+                          }
+                        }}
+                        className={`px-2 py-1 text-[10px] md:px-3 md:py-1.5 md:text-xs font-medium rounded transition-all ${isActive ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-1">
+                  <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="bg-slate-100 border-none rounded-lg px-2 py-1 text-[11px] md:text-xs focus:ring-2 focus:ring-primary/20" />
+                  <span className="text-slate-400 text-xs">~</span>
+                  <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="bg-slate-100 border-none rounded-lg px-2 py-1 text-[11px] md:text-xs focus:ring-2 focus:ring-primary/20" />
+                </div>
+              </div>
+            </div>
+
+            {/* 구분선 (데스크탑) */}
+            <div className="hidden md:block w-px h-12 bg-slate-200 self-center" />
+
+            {/* 정렬/옵션 */}
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] text-slate-400 font-medium">정렬 / 옵션</span>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setSortOrder(s => s === "desc" ? "asc" : "desc")} className="flex items-center gap-1 px-2 py-1.5 rounded-md text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
+                  <span className="material-icons text-sm">swap_vert</span>
+                  <span>{sortOrder === "desc" ? "최신순" : "오래된순"}</span>
+                </button>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={includeDone} onChange={e => setIncludeDone(e.target.checked)} className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4" />
+                  <span className="text-[11px] font-bold text-slate-500">완료 항목 포함</span>
+                </label>
+              </div>
+            </div>
+
+            {/* 초기화 */}
+            {activeFilterCount > 0 && (
+              <>
+                <div className="hidden md:block w-px h-12 bg-slate-200 self-center" />
+                <div className="flex flex-col gap-1 md:self-center">
+                  <button onClick={resetFilters} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-red-500 hover:bg-red-50 transition-colors md:mt-4">
+                    <span className="material-icons text-sm">restart_alt</span>
+                    초기화
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
 
         {/* Content Area */}
         <div className="flex-1 overflow-hidden p-2 md:p-6 relative" tabIndex={-1} ref={viewContainerRef}>
@@ -1431,14 +1472,4 @@ function TagChip({ label, tone }: { label: string; tone: "indigo" | "slate" | "a
   return <span className={`px-2 py-1 text-[11px] md:px-1.5 md:py-0.5 md:text-[10px] rounded font-bold ${classes}`} title={label} aria-label={label}>{label}</span>;
 }
 
-function Legend() {
-  return (
-    <div className="flex items-center gap-2 text-[11px] text-slate-500">
-      <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-100 border border-blue-200"></span>나이/성별</span>
-      <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-purple-100 border border-purple-200"></span>유입채널</span>
-      <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-slate-100 border border-slate-200"></span>유입일시</span>
-      <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-indigo-100 border border-indigo-200"></span>특화진료</span>
-    </div>
-  );
-}
 
