@@ -607,7 +607,7 @@ function CrmShell() {
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Zone A: Primary Bar */}
-        <header className="flex items-center gap-2 px-3 py-2 md:px-6 bg-card border-b border-border shrink-0">
+        <header className="flex flex-wrap items-center gap-2 px-3 py-2 md:px-6 bg-card border-b border-border shrink-0">
           <h1 className="text-base md:text-xl font-bold shrink-0">접수 현황</h1>
           <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
             <button aria-pressed={viewMode === "kanban"} onClick={() => setViewMode("kanban")} disabled={loading} className={`px-2 py-1 text-[10px] md:px-3 md:py-1.5 md:text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "kanban" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">view_kanban</span><span className="hidden sm:inline"> 칸반</span></button>
@@ -615,7 +615,7 @@ function CrmShell() {
             <button aria-pressed={viewMode === "calendar"} onClick={() => setViewMode("calendar")} disabled={loading} className={`px-2 py-1 text-[10px] md:px-3 md:py-1.5 md:text-xs font-medium rounded flex items-center gap-1.5 transition-all ${viewMode === "calendar" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} ${loading ? "opacity-60 cursor-not-allowed" : ""}`}><span className="material-icons text-sm">calendar_today</span><span className="hidden sm:inline"> 캘린더</span></button>
           </div>
           <div className="flex-1" />
-          <div className="relative flex-1 min-w-0 max-w-xs">
+          <div className="relative w-full md:w-auto md:flex-1 min-w-0 md:max-w-xs order-last md:order-none">
             <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">search</span>
             <input ref={searchInputRef} type="text" placeholder="환자명, 전화번호..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-100 border-none rounded-lg py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary/20" />
           </div>
