@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import type { Lead, User, CrmStatus, LeadMemo, SmsTemplate } from "../types";
 import { statusOptions, statusStyles, fmtCreatedAt, toIsoLocal } from "../types";
-import { PhoneLink } from "./phone-link";
+import { PhoneLink, downloadVCard } from "./phone-link";
 import { TagChip } from "./tag-chip";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -141,6 +141,16 @@ export function LeadDrawer({
           <div className="flex items-center gap-2 text-sm md:text-base text-slate-500">
             <span className="material-icons text-[14px] md:text-[16px]">smartphone</span>
             {lead?.phone ? <PhoneLink phone={lead.phone} /> : ""}
+            {lead?.phone && (
+              <button
+                onClick={() => downloadVCard(lead.name, lead.phone)}
+                className="text-slate-400 hover:text-primary transition-colors shrink-0 p-1 -m-1"
+                title="연락처 저장"
+                aria-label="연락처 저장"
+              >
+                <span className="material-icons" style={{ fontSize: "16px" }}>person_add</span>
+              </button>
+            )}
           </div>
           {lead && (
             <div className="flex flex-wrap gap-1.5 md:gap-2">

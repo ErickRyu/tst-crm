@@ -2,6 +2,17 @@
 
 import { useState } from "react";
 
+export function downloadVCard(name: string, phone: string) {
+  const vcard = `BEGIN:VCARD\nVERSION:3.0\nFN:${name}\nTEL;TYPE=CELL:${phone}\nEND:VCARD`;
+  const blob = new Blob([vcard], { type: "text/vcard;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${name}.vcf`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function PhoneLink({ phone, className = "" }: { phone: string; className?: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async (e: React.MouseEvent) => {
