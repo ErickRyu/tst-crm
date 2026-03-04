@@ -24,10 +24,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       );
     }
 
-    const { statuses, ...rest } = parsed.data;
+    const { statuses, isActive, ...rest } = parsed.data;
     const updates: Record<string, unknown> = { ...rest, updatedAt: new Date() };
     if (statuses !== undefined) {
       updates.statuses = statuses ? JSON.stringify(statuses) : null;
+    }
+    if (isActive !== undefined) {
+      updates.isActive = isActive ? 1 : 0;
     }
     if (rest.body) {
       updates.msgType = calcMsgType(rest.body).msgType;
@@ -57,6 +60,18 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   }
 
   try {
+    // Guard: prevent deletion of default templates
+    const [existing] = await db
+      .select({ isDefault: smsTemplates.isDefault })
+      .from(smsTemplates)
+      .where(eq(smsTemplates.id, id));
+    if (existing?.isDefault === 1) {
+      return NextResponse.json(
+        { code: 403, message: "기본 템플릿은 삭제할 수 없습니다. 비활성화를 이용해주세요." },
+        { status: 403 }
+      );
+    }
+
     const [updated] = await db
       .update(smsTemplates)
       .set({ isActive: 0, updatedAt: new Date() })

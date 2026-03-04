@@ -86,6 +86,7 @@ export const smsTemplates = pgTable("sms_templates", {
   statuses: text("statuses"), // JSON string array
   sortOrder: integer("sort_order").default(0).notNull(),
   isActive: integer("is_active").default(1).notNull(),
+  isDefault: integer("is_default").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

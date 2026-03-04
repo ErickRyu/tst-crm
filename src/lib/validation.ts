@@ -126,6 +126,7 @@ export const smsTemplateUpdateSchema = z.object({
   body: z.string().min(1).max(2000).optional(),
   category: z.string().max(50).nullable().optional(),
   statuses: z.array(z.string()).nullable().optional(),
+  isActive: z.boolean().optional(),
 });
 
 // --- Auto-send rule schemas ---
