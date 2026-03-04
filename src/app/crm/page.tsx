@@ -1223,7 +1223,7 @@ function LeadDrawer({
               {lead.age != null && <TagChip label={`${lead.age}세`} tone="blue" />}
               {lead.gender && <TagChip label={lead.gender === "남" ? "남" : "여"} tone={lead.gender === "남" ? "blue" : "pink"} />}
               {lead.media && <TagChip label={lead.media} tone="purple" />}
-              <TagChip label={lead.careTag} tone={lead.careTag.includes("임플란트") ? "indigo" : "slate"} />
+              {lead.careTag && <TagChip label={lead.careTag} tone={lead.careTag.includes("임플란트") ? "indigo" : "slate"} />}
             </div>
           )}
         </div>
