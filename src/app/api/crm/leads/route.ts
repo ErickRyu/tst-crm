@@ -6,6 +6,7 @@ import {
   ACTIONABLE_STATUSES,
   CRM_PRIORITY,
   DONE_STATUSES,
+  HIDDEN_STATUSES,
   calculateSeniorBadge,
   CrmStatus,
 } from "@/lib/crm";
@@ -147,6 +148,7 @@ export async function GET(request: NextRequest) {
         to: toParam || undefined,
         actionableStatuses: ACTIONABLE_STATUSES,
         doneStatuses: DONE_STATUSES,
+        hiddenStatuses: HIDDEN_STATUSES,
         ...(isPaginated && {
           page,
           pageSize,

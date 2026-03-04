@@ -4,6 +4,7 @@ import {
   CRM_PRIORITY,
   ACTIONABLE_STATUSES,
   DONE_STATUSES,
+  HIDDEN_STATUSES,
   CrmStatus,
 } from "./crm";
 
@@ -31,31 +32,36 @@ describe("CRM_PRIORITY", () => {
 
 // ─── ACTIONABLE_STATUSES / DONE_STATUSES ───
 
-describe("ACTIONABLE_STATUSES / DONE_STATUSES", () => {
-  it("ACTIONABLE_STATUSES는 5개여야 한다", () => {
-    expect(ACTIONABLE_STATUSES).toHaveLength(5);
+describe("ACTIONABLE_STATUSES / DONE_STATUSES / HIDDEN_STATUSES", () => {
+  it("ACTIONABLE_STATUSES는 6개여야 한다", () => {
+    expect(ACTIONABLE_STATUSES).toHaveLength(6);
   });
 
   it("DONE_STATUSES는 3개여야 한다", () => {
     expect(DONE_STATUSES).toHaveLength(3);
   });
 
-  it("ACTIONABLE과 DONE 사이에 겹치는 상태가 없어야 한다", () => {
-    const overlap = ACTIONABLE_STATUSES.filter((s) =>
-      (DONE_STATUSES as CrmStatus[]).includes(s)
-    );
-    expect(overlap).toHaveLength(0);
+  it("HIDDEN_STATUSES는 3개여야 한다", () => {
+    expect(HIDDEN_STATUSES).toHaveLength(3);
   });
 
-  it("CRM_PRIORITY가 모든 CrmStatus를 포함해야 한다", () => {
-    const priorityKeys = new Set(Object.keys(CRM_PRIORITY));
-    const allStatuses = new Set([...ACTIONABLE_STATUSES, ...DONE_STATUSES]);
-    // ACTIONABLE + DONE statuses must all exist in CRM_PRIORITY
-    for (const s of allStatuses) {
-      expect(priorityKeys.has(s)).toBe(true);
+  it("카테고리 간 겹치는 상태가 없어야 한다", () => {
+    const actionSet = new Set(ACTIONABLE_STATUSES);
+    const doneSet = new Set(DONE_STATUSES);
+    const hiddenSet = new Set(HIDDEN_STATUSES);
+    for (const s of DONE_STATUSES) expect(actionSet.has(s)).toBe(false);
+    for (const s of HIDDEN_STATUSES) {
+      expect(actionSet.has(s)).toBe(false);
+      expect(doneSet.has(s)).toBe(false);
     }
-    // CRM_PRIORITY should cover all 12 statuses
-    expect(priorityKeys.size).toBe(12);
+  });
+
+  it("ACTIONABLE + DONE + HIDDEN = 12개 상태를 모두 포함해야 한다", () => {
+    const all = new Set([...ACTIONABLE_STATUSES, ...DONE_STATUSES, ...HIDDEN_STATUSES]);
+    expect(all.size).toBe(12);
+    for (const key of Object.keys(CRM_PRIORITY)) {
+      expect(all.has(key as CrmStatus)).toBe(true);
+    }
   });
 });
 
