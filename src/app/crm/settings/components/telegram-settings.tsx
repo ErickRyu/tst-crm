@@ -29,6 +29,8 @@ export function TelegramSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [detecting, setDetecting] = useState(false);
+  const [detectedChats, setDetectedChats] = useState<{ id: number; type: string; title?: string; first_name?: string; username?: string }[] | null>(null);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   const fetchSettings = useCallback(async () => {
@@ -158,14 +160,71 @@ export function TelegramSettings() {
 
           <div>
             <Label className="text-sm font-medium text-slate-700 mb-1 block">Chat ID</Label>
-            <Input
-              value={settings.telegram_chat_id}
-              onChange={(e) => setSettings({ ...settings, telegram_chat_id: e.target.value })}
-              placeholder="-1001234567890"
-              className="max-w-md font-mono text-sm"
-            />
+            <div className="flex gap-2">
+              <Input
+                value={settings.telegram_chat_id}
+                onChange={(e) => { setSettings({ ...settings, telegram_chat_id: e.target.value }); setDetectedChats(null); }}
+                placeholder="-1001234567890"
+                className="max-w-md font-mono text-sm"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={detecting || (!newToken && !settings.telegram_bot_token)}
+                onClick={async () => {
+                  const token = newToken;
+                  if (!token) { toast.error("Chat ID 감지를 위해 Bot Token을 먼저 입력해주세요."); return; }
+                  setDetecting(true);
+                  setDetectedChats(null);
+                  try {
+                    const res = await fetch("/api/crm/telegram/test", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ botToken: token, action: "detect" }),
+                    });
+                    const json = await res.json();
+                    if (res.ok && json.data) {
+                      setDetectedChats(json.data);
+                      if (json.data.length === 1) {
+                        setSettings((s) => ({ ...s, telegram_chat_id: String(json.data[0].id) }));
+                        toast.success("Chat ID가 자동으로 설정되었습니다.");
+                      }
+                    } else {
+                      toast.error(json.message || "감지 실패");
+                    }
+                  } catch {
+                    toast.error("네트워크 오류");
+                  } finally {
+                    setDetecting(false);
+                  }
+                }}
+              >
+                {detecting ? "감지 중..." : "자동 감지"}
+              </Button>
+            </div>
+            {detectedChats && detectedChats.length > 1 && (
+              <div className="mt-2 space-y-1">
+                <p className="text-xs text-slate-500">{detectedChats.length}개의 채팅이 감지되었습니다. 선택하세요:</p>
+                {detectedChats.map((chat) => (
+                  <button
+                    key={chat.id}
+                    className={`w-full text-left px-3 py-1.5 rounded text-xs border transition-colors ${
+                      settings.telegram_chat_id === String(chat.id)
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-slate-200 hover:border-slate-300 text-slate-600"
+                    }`}
+                    onClick={() => setSettings({ ...settings, telegram_chat_id: String(chat.id) })}
+                  >
+                    <span className="font-mono font-medium">{chat.id}</span>
+                    <span className="ml-2 text-slate-400">
+                      {chat.title || chat.first_name || chat.username || chat.type}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
             <p className="text-xs text-slate-400 mt-1">
-              개인 채팅 또는 그룹/채널 ID. @userinfobot 으로 확인 가능합니다.
+              봇에게 메시지를 보낸 후 &quot;자동 감지&quot; 버튼을 누르면 Chat ID를 자동으로 찾습니다.
             </p>
           </div>
         </div>

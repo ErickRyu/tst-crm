@@ -144,3 +144,42 @@ export async function testTelegramConnection(
   const text = "✅ <b>텔레그램 알림 연동 테스트</b>\n\nCRM 알림이 정상적으로 연결되었습니다.";
   return sendTelegramMessage(botToken, chatId, text);
 }
+
+interface TelegramChat {
+  id: number;
+  type: string;
+  title?: string;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+}
+
+export async function detectChatIds(
+  botToken: string
+): Promise<{ ok: boolean; chats: TelegramChat[]; description?: string }> {
+  const res = await fetch(
+    `https://api.telegram.org/bot${botToken}/getUpdates?limit=100`
+  );
+  const data = await res.json();
+
+  if (!data.ok) {
+    return { ok: false, chats: [], description: data.description };
+  }
+
+  const chatMap = new Map<number, TelegramChat>();
+  for (const update of data.result || []) {
+    const msg = update.message || update.channel_post;
+    if (msg?.chat) {
+      chatMap.set(msg.chat.id, {
+        id: msg.chat.id,
+        type: msg.chat.type,
+        title: msg.chat.title,
+        first_name: msg.chat.first_name,
+        last_name: msg.chat.last_name,
+        username: msg.chat.username,
+      });
+    }
+  }
+
+  return { ok: true, chats: Array.from(chatMap.values()) };
+}
