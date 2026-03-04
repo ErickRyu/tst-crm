@@ -2,7 +2,6 @@
   "permissions": {
     "allow": [
       "WebSearch",
-
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
@@ -18,7 +17,6 @@
       "Bash(git restore:*)",
       "Bash(git remote:*)",
       "Bash(git tag:*)",
-
       "Bash(npm install:*)",
       "Bash(npm run:*)",
       "Bash(npx next build)",
@@ -27,7 +25,6 @@
       "Bash(npx vitest:*)",
       "Bash(npx drizzle-kit:*)",
       "Bash(npx shadcn@latest:*)",
-
       "Bash(node:*)",
       "Bash(curl:*)",
       "Bash(sqlite3:*)",
@@ -35,11 +32,9 @@
       "Bash(cp:*)",
       "Bash(mv:*)",
       "Bash(touch:*)",
-
       "WebFetch(domain:www.dentweb.co.kr)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:vibekanban.com)",
-
       "mcp__stitch__list_projects",
       "mcp__vibe_kanban__list_tags",
       "mcp__vibe_kanban__create_issue",
@@ -50,8 +45,9 @@
       "mcp__vibe_kanban__update_issue",
       "mcp__vibe_kanban__list_projects",
       "mcp__vibe_kanban__list_organizations",
-
-      "Skill(commit-commands:commit)"
+      "Skill(commit-commands:commit)",
+      "Bash(git:*)",
+      "Bash(gh api:*)"
     ]
   }
 }
