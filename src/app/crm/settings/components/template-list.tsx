@@ -12,6 +12,7 @@ interface Template {
   icon: string;
   body: string;
   msgType: "SMS" | "LMS";
+  byteLength?: number;
   category: string | null;
   statuses: string[] | null;
 }
@@ -110,7 +111,11 @@ export function TemplateList() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="font-medium text-sm text-slate-900">{tpl.label}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{tpl.msgType}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                    tpl.msgType === "LMS" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500"
+                  }`}>
+                    {tpl.byteLength != null ? `${tpl.byteLength}byte · ` : ""}{tpl.msgType}
+                  </span>
                   {tpl.category && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">{tpl.category}</span>
                   )}

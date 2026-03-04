@@ -116,7 +116,6 @@ export const smsTemplateCreateSchema = z.object({
   label: z.string().min(1).max(100),
   icon: z.string().min(1).max(50),
   body: z.string().min(1).max(2000),
-  msgType: z.enum(["SMS", "LMS"]),
   category: z.string().max(50).nullable().optional(),
   statuses: z.array(z.string()).nullable().optional(),
 });
@@ -125,7 +124,6 @@ export const smsTemplateUpdateSchema = z.object({
   label: z.string().min(1).max(100).optional(),
   icon: z.string().min(1).max(50).optional(),
   body: z.string().min(1).max(2000).optional(),
-  msgType: z.enum(["SMS", "LMS"]).optional(),
   category: z.string().max(50).nullable().optional(),
   statuses: z.array(z.string()).nullable().optional(),
 });

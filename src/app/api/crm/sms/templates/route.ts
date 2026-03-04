@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { smsTemplates } from "@/lib/schema";
-import { eq } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { smsTemplateCreateSchema } from "@/lib/validation";
+import { calcMsgType } from "@/lib/sms";
 
 export async function GET() {
   try {
@@ -10,19 +11,22 @@ export async function GET() {
       .select()
       .from(smsTemplates)
       .where(eq(smsTemplates.isActive, 1))
-      .orderBy(smsTemplates.id);
+      .orderBy(asc(smsTemplates.sortOrder), asc(smsTemplates.id));
 
-    // Map to the shape the frontend expects
-    const data = templates.map((t) => ({
-      id: t.id,
-      key: t.key,
-      label: t.label,
-      icon: t.icon,
-      body: t.body,
-      msgType: t.msgType,
-      category: t.category,
-      statuses: t.statuses ? JSON.parse(t.statuses) : undefined,
-    }));
+    const data = templates.map((t) => {
+      const { byteLength, msgType } = calcMsgType(t.body);
+      return {
+        id: t.id,
+        key: t.key,
+        label: t.label,
+        icon: t.icon,
+        body: t.body,
+        msgType,
+        byteLength,
+        category: t.category,
+        statuses: t.statuses ? JSON.parse(t.statuses) : undefined,
+      };
+    });
 
     return NextResponse.json({
       code: 200,
@@ -52,10 +56,12 @@ export async function POST(request: NextRequest) {
     }
 
     const { statuses, ...rest } = parsed.data;
+    const { msgType } = calcMsgType(rest.body);
     const [created] = await db
       .insert(smsTemplates)
       .values({
         ...rest,
+        msgType,
         statuses: statuses ? JSON.stringify(statuses) : null,
       })
       .returning();

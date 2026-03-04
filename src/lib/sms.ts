@@ -105,6 +105,15 @@ export const SMS_TEMPLATES: SmsTemplate[] = [
   },
 ];
 
+// ---------- Byte calculation utility ----------
+export function calcMsgType(msg: string): { byteLength: number; msgType: "SMS" | "LMS" } {
+  let byteLength = 0;
+  for (const ch of msg) {
+    byteLength += ch.charCodeAt(0) > 127 ? 2 : 1;
+  }
+  return { byteLength, msgType: byteLength > 90 ? "LMS" : "SMS" };
+}
+
 // ---------- Send SMS ----------
 export async function sendSms(params: {
   receiver: string;
@@ -130,13 +139,8 @@ export async function sendSms(params: {
     msg = msg.replace(/\{고객이름\}/g, params.patientName);
   }
 
-  // 90바이트(한글 45자) 초과시 자동 LMS 전환
-  // EUC-KR: 한글/한자 2byte, ASCII 1byte
-  let byteLength = 0;
-  for (const ch of msg) {
-    byteLength += ch.charCodeAt(0) > 127 ? 2 : 1;
-  }
-  const msgType = params.msgType || (byteLength > 90 ? "LMS" : "SMS");
+  const { msgType: autoType } = calcMsgType(msg);
+  const msgType = params.msgType || autoType;
 
   // aligoapi expects Express-like req object
   const req = {

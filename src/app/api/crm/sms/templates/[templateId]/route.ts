@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { smsTemplates } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { smsTemplateUpdateSchema } from "@/lib/validation";
+import { calcMsgType } from "@/lib/sms";
 
 type Params = { params: Promise<{ templateId: string }> };
 
@@ -27,6 +28,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const updates: Record<string, unknown> = { ...rest, updatedAt: new Date() };
     if (statuses !== undefined) {
       updates.statuses = statuses ? JSON.stringify(statuses) : null;
+    }
+    if (rest.body) {
+      updates.msgType = calcMsgType(rest.body).msgType;
     }
 
     const [updated] = await db

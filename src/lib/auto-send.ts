@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { autoSendRules, smsTemplates, smsLogs, crmSettings, users } from "@/lib/schema";
 import { eq, and, gte } from "drizzle-orm";
-import { sendSms } from "@/lib/sms";
+import { sendSms, calcMsgType } from "@/lib/sms";
 
 export interface LeadContext {
   leadId: number;
@@ -161,12 +161,13 @@ export async function executeAutoSend(
     if (!tpl) continue;
 
     const msg = replaceVariables(tpl.body, vars);
+    const { msgType: computedMsgType } = calcMsgType(msg);
 
     try {
       const result = await sendSms({
         receiver: ctx.phone,
         msg,
-        msgType: tpl.msgType as "SMS" | "LMS",
+        msgType: computedMsgType,
         title: tpl.label,
       });
 
@@ -175,7 +176,7 @@ export async function executeAutoSend(
         phone: ctx.phone,
         templateKey: tpl.key,
         body: msg,
-        msgType: tpl.msgType,
+        msgType: computedMsgType,
         status: result.result_code === "1" ? "sent" : "failed",
         senderName: "시스템(자동)",
         msgId: result.msg_id || null,
@@ -190,7 +191,7 @@ export async function executeAutoSend(
         phone: ctx.phone,
         templateKey: tpl.key,
         body: msg,
-        msgType: tpl.msgType,
+        msgType: computedMsgType,
         status: "failed",
         senderName: "시스템(자동)",
         errorMessage: err instanceof Error ? err.message : "Unknown error",
