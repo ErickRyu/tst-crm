@@ -596,6 +596,7 @@ function CrmShell() {
           <button className="p-3 text-slate-400 hover:text-primary"><span className="material-icons">chat</span></button>
         </nav>
         <div className="mt-auto flex flex-col gap-4 items-center">
+          <button className="p-3 text-slate-400 hover:text-primary" onClick={() => window.location.href = "/crm/updates"}><span className="material-icons">campaign</span></button>
           <button className="p-3 text-slate-400"><span className="material-icons">settings</span></button>
           <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
