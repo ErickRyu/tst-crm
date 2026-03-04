@@ -15,6 +15,7 @@ interface Template {
   msgType: "SMS" | "LMS";
   category: string | null;
   statuses: string[] | null;
+  isDefault?: boolean;
 }
 
 interface TemplateEditorProps {
@@ -124,6 +125,13 @@ export function TemplateEditor({ template, onSave, onCancel }: TemplateEditorPro
           취소
         </Button>
       </div>
+
+      {template?.isDefault && (
+        <div className="mb-4 flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-700">
+          <span className="material-icons text-sm mt-0.5">info</span>
+          <span>기본 템플릿입니다. 내용을 수정할 수 있으며, 삭제는 불가합니다.</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Form */}

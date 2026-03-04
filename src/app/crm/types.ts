@@ -87,6 +87,8 @@ export interface SmsTemplate {
   msgType: "SMS" | "LMS";
   category?: string;
   statuses?: string[];
+  isDefault?: boolean;
+  isActive?: boolean;
 }
 
 export interface PaginationProps {

@@ -1,16 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { smsTemplates } from "@/lib/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, or, asc } from "drizzle-orm";
 import { smsTemplateCreateSchema } from "@/lib/validation";
 import { calcMsgType } from "@/lib/sms";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const includeDisabledDefaults =
+      request.nextUrl.searchParams.get("includeDisabledDefaults") === "true";
+
+    const whereClause = includeDisabledDefaults
+      ? or(eq(smsTemplates.isActive, 1), eq(smsTemplates.isDefault, 1))
+      : eq(smsTemplates.isActive, 1);
+
     const templates = await db
       .select()
       .from(smsTemplates)
-      .where(eq(smsTemplates.isActive, 1))
+      .where(whereClause)
       .orderBy(asc(smsTemplates.sortOrder), asc(smsTemplates.id));
 
     const data = templates.map((t) => {
@@ -25,6 +32,8 @@ export async function GET() {
         byteLength,
         category: t.category,
         statuses: t.statuses ? JSON.parse(t.statuses) : undefined,
+        isDefault: t.isDefault === 1,
+        isActive: t.isActive === 1,
       };
     });
 
