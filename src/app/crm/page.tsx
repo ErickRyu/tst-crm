@@ -833,7 +833,7 @@ function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, on
               <th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">태그 및 뱃지</th>
               <th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">상태 (인라인)</th>
               <th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">담당자 (인라인)</th>
-              <th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">예약 일정</th>
+              <th className="px-3 py-3 font-semibold text-slate-500 uppercase text-[10px]">예약 일정</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -861,11 +861,8 @@ function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, on
                     {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </td>
-                <td className="px-6 py-3" onClick={stop}>
-                  <div className="flex gap-1 items-center">
-                    <input type="datetime-local" defaultValue={toIsoLocal(l.appointmentAt)} onBlur={e => onSchedule(l.id, "appointmentAt", e.target.value)} className="text-[10px] border-slate-200 rounded px-1.5 py-0.5" />
-                    <span className="material-icons text-[14px] text-slate-300">calendar_today</span>
-                  </div>
+                <td className="px-3 py-3" onClick={stop}>
+                    <input type="datetime-local" defaultValue={toIsoLocal(l.appointmentAt)} onBlur={e => onSchedule(l.id, "appointmentAt", e.target.value)} className="text-[10px] border-slate-200 rounded px-1 py-0.5" />
                 </td>
               </tr>
             ))}
