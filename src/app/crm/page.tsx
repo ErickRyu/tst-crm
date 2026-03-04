@@ -796,10 +796,10 @@ function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, on
         {loading && <div className="flex items-center justify-center py-10"><span className="material-icons text-slate-400 animate-pulse">hourglass_empty</span></div>}
         {!loading && leads.length === 0 && <div className="py-20 text-center text-slate-400">조회된 데이터가 없습니다.</div>}
         {!loading && <div className="divide-y divide-slate-100">
-          {leads.map((l) => (
+          {leads.map((l, idx) => (
             <div key={l.id} onClick={() => onSelect(l.id)} className={`p-3 cursor-pointer transition-colors ${selectedId === l.id ? "bg-blue-50/50" : ""}`}>
               <div className="flex justify-between items-start mb-2">
-                <div><div className="font-bold text-sm text-slate-900">{l.name}</div><PhoneLink phone={l.phone} className="text-xs text-slate-500" /></div>
+                <div className="flex items-start gap-2"><span className="text-[11px] font-semibold text-slate-400 mt-0.5 min-w-[1.2rem]">{idx + 1}</span><div><div className="font-bold text-sm text-slate-900">{l.name}</div><PhoneLink phone={l.phone} className="text-xs text-slate-500" /></div></div>
                 <div className="text-[10px] text-slate-400 whitespace-nowrap">{fmtCreatedAt(l.createdAt)}</div>
               </div>
               <div className="flex flex-wrap gap-1 mb-2">
@@ -827,6 +827,7 @@ function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, on
         <table className="w-full text-left text-sm border-collapse">
           <thead className="sticky top-0 bg-slate-50 border-b border-border z-10">
             <tr>
+              <th className="px-4 py-3 font-semibold text-slate-500 uppercase text-[10px] w-10">No.</th>
               <th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">환자 정보</th>
               <th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">태그 및 뱃지</th>
               <th className="px-6 py-3 font-semibold text-slate-500 uppercase text-[10px]">상태 (인라인)</th>
@@ -835,8 +836,9 @@ function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, on
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {leads.map((l) => (
+            {leads.map((l, idx) => (
               <tr key={l.id} onClick={() => onSelect(l.id)} className={`hover:bg-slate-50 cursor-pointer transition-colors ${selectedId === l.id ? "bg-blue-50/50" : ""}`}>
+                <td className="px-4 py-3 text-center text-xs text-slate-400 font-semibold">{idx + 1}</td>
                 <td className="px-6 py-3"><div className="flex items-center gap-2"><div><div className="font-bold text-slate-900">{l.name}</div><PhoneLink phone={l.phone} className="text-[10px] text-slate-500" /></div></div></td>
                 <td className="px-6 py-3">
                   <div className="flex gap-1 flex-wrap">
@@ -867,7 +869,7 @@ function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, on
               </tr>
             ))}
             {leads.length === 0 && !loading && (
-              <tr><td colSpan={5} className="py-20 text-center text-slate-400">조회된 데이터가 없습니다.</td></tr>
+              <tr><td colSpan={6} className="py-20 text-center text-slate-400">조회된 데이터가 없습니다.</td></tr>
             )}
           </tbody>
         </table>
