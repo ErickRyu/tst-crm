@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { leads, leadMemos } from "@/lib/schema";
 import { memoCreateSchema } from "@/lib/validation";
@@ -18,7 +18,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
     .from(leadMemos)
     .where(eq(leadMemos.leadId, id))
     .orderBy(desc(leadMemos.createdAt))
-    .limit(100);
+    .limit(1);
 
   return NextResponse.json({ code: 200, message: "메모 조회 성공", data: rows });
 }
@@ -43,12 +43,36 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ code: 404, message: "리드를 찾을 수 없습니다." }, { status: 404 });
     }
 
-    const [created] = await db
-      .insert(leadMemos)
-      .values({ leadId: id, authorName: parsed.data.authorName, body: parsed.data.body })
-      .returning();
+    // Upsert: 기존 메모가 있으면 업데이트, 없으면 새로 생성
+    const [existing] = await db
+      .select()
+      .from(leadMemos)
+      .where(eq(leadMemos.leadId, id))
+      .orderBy(desc(leadMemos.createdAt))
+      .limit(1);
 
-    return NextResponse.json({ code: 201, message: "메모가 저장되었습니다.", data: created }, { status: 201 });
+    let memo;
+    if (existing) {
+      const [updated] = await db
+        .update(leadMemos)
+        .set({
+          body: parsed.data.body,
+          authorName: parsed.data.authorName,
+          version: sql`${leadMemos.version} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(leadMemos.id, existing.id))
+        .returning();
+      memo = updated;
+    } else {
+      const [created] = await db
+        .insert(leadMemos)
+        .values({ leadId: id, authorName: parsed.data.authorName, body: parsed.data.body })
+        .returning();
+      memo = created;
+    }
+
+    return NextResponse.json({ code: 200, message: "메모가 저장되었습니다.", data: memo });
   } catch {
     return NextResponse.json({ code: 400, message: "잘못된 요청입니다." }, { status: 400 });
   }
