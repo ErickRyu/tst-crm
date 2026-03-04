@@ -1,21 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { testTelegramConnection, detectChatIds } from "@/lib/telegram";
+import { testTelegramConnection, detectChatIds, getTelegramSettings } from "@/lib/telegram";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { botToken, chatId, action } = body;
 
-    if (!botToken) {
+    // body에 값이 없으면 DB에서 복호화된 토큰을 가져옴
+    const settings = (!botToken || (!chatId && action !== "detect"))
+      ? await getTelegramSettings()
+      : null;
+    const token = botToken || settings?.botToken;
+
+    if (!token) {
       return NextResponse.json(
-        { code: 400, message: "Bot Token을 입력해주세요." },
+        { code: 400, message: "저장된 Bot Token이 없습니다. 먼저 토큰을 저장해주세요." },
         { status: 400 }
       );
     }
 
     // Chat ID 자동 감지
     if (action === "detect") {
-      const result = await detectChatIds(botToken);
+      const result = await detectChatIds(token);
       if (!result.ok) {
         return NextResponse.json(
           { code: 400, message: `감지 실패: ${result.description || "알 수 없는 오류"}` },
@@ -32,14 +38,15 @@ export async function POST(request: NextRequest) {
     }
 
     // 테스트 메시지 전송
-    if (!chatId) {
+    const chat = chatId || settings?.chatId;
+    if (!chat) {
       return NextResponse.json(
-        { code: 400, message: "Chat ID를 입력해주세요." },
+        { code: 400, message: "저장된 Chat ID가 없습니다. 먼저 Chat ID를 설정해주세요." },
         { status: 400 }
       );
     }
 
-    const result = await testTelegramConnection(botToken, chatId);
+    const result = await testTelegramConnection(token, chat);
 
     if (result.ok) {
       return NextResponse.json({ code: 200, message: "테스트 메시지가 전송되었습니다." });
