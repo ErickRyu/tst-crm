@@ -9,13 +9,15 @@ const sql = neon(process.env.DATABASE_URL);
 
 async function run() {
   const migration = readFileSync("drizzle/0006_sms_templates_is_default.sql", "utf-8");
-  const statements = migration
+  // Strip comment lines first, then split on semicolons
+  const cleaned = migration.replace(/--.*$/gm, "");
+  const statements = cleaned
     .split(";")
     .map(s => s.trim())
-    .filter(s => s.length > 0 && !s.startsWith("--"));
+    .filter(s => s.length > 0);
 
   for (const stmt of statements) {
-    console.log("Executing:", stmt.slice(0, 60) + "...");
+    console.log("Executing:", stmt.slice(0, 80) + "...");
     await sql(stmt);
     console.log("OK");
   }
