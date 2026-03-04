@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { toast } from "sonner";
 import { useLoading } from "../ui/loading-overlay";
 import type { ViewMode, Scope, CrmStatus, Lead, User, CalendarEvent, LeadMemo, SmsTemplate } from "../types";
-import { statusOptions } from "../types";
+import { statusOptions, kanbanStatusOptions, statusStyles } from "../types";
 import { KanbanView } from "./kanban-view";
 import { ListView } from "./list-view";
 import { CalendarView } from "./calendar-view";
@@ -365,12 +365,16 @@ export function CrmShell() {
 
   const DONE_STATUS_SET = useMemo(() => new Set<CrmStatus>(["응대중", "통화완료", "예약완료"]), []);
 
+  const HIDDEN_STATUS_SET = useMemo(() => new Set<CrmStatus>(["추가상담거부", "블랙리스트", "중복"]), []);
+  const KANBAN_STATUS_SET = useMemo(() => new Set<string>(kanbanStatusOptions), []);
+
   const groupedLeads = useMemo(() => {
-    const g: Record<CrmStatus, Lead[]> = { "신규인입": [], "1차부재": [], "2차부재": [], "3차부재": [], "노쇼": [], "응대중": [], "통화완료": [], "예약완료": [] };
+    const g: Record<string, Lead[]> = Object.fromEntries(kanbanStatusOptions.map(s => [s, [] as Lead[]]));
     const cutoff = kanbanDoneDays != null
       ? new Date(Date.now() - kanbanDoneDays * 24 * 60 * 60 * 1000)
       : null;
     filteredLeads.forEach(l => {
+      if (!KANBAN_STATUS_SET.has(l.crmStatus)) return;
       if (DONE_STATUS_SET.has(l.crmStatus) && cutoff) {
         if (new Date(l.createdAt) >= cutoff) g[l.crmStatus].push(l);
       } else {
@@ -378,11 +382,21 @@ export function CrmShell() {
       }
     });
     return g;
-  }, [filteredLeads, kanbanDoneDays, DONE_STATUS_SET]);
+  }, [filteredLeads, kanbanDoneDays, DONE_STATUS_SET, KANBAN_STATUS_SET]);
 
   const doneTotalCounts = useMemo(() => {
-    const counts: Record<CrmStatus, number> = { "신규인입": 0, "1차부재": 0, "2차부재": 0, "3차부재": 0, "노쇼": 0, "응대중": 0, "통화완료": 0, "예약완료": 0 };
-    filteredLeads.forEach(l => { counts[l.crmStatus]++; });
+    const counts: Record<string, number> = Object.fromEntries(kanbanStatusOptions.map(s => [s, 0]));
+    filteredLeads.forEach(l => {
+      if (l.crmStatus in counts) counts[l.crmStatus]++;
+    });
+    return counts;
+  }, [filteredLeads]);
+
+  const hiddenCounts = useMemo(() => {
+    const counts: Record<string, number> = { "추가상담거부": 0, "블랙리스트": 0, "중복": 0 };
+    filteredLeads.forEach(l => {
+      if (l.crmStatus in counts) counts[l.crmStatus]++;
+    });
     return counts;
   }, [filteredLeads]);
 
@@ -489,7 +503,24 @@ export function CrmShell() {
         {/* Content Area */}
         <div className="flex-1 overflow-hidden p-2 md:p-6 relative" tabIndex={-1} ref={viewContainerRef}>
           {loading && !hasLoaded.current && <SkeletonOverlay viewMode={viewMode} />}
-          {(hasLoaded.current || !loading) && viewMode === "kanban" && <KanbanView grouped={groupedLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onSaveMemo={saveQuickMemo} draggingId={draggingId} setDraggingId={setDraggingId} dragOverStatus={dragOverStatus} setDragOverStatus={setDragOverStatus} doneTotalCounts={doneTotalCounts} kanbanDoneDays={kanbanDoneDays} onKanbanDoneDaysChange={setKanbanDoneDays} />}
+          {(hasLoaded.current || !loading) && viewMode === "kanban" && (
+            <div className="flex flex-col h-full gap-2">
+              {(hiddenCounts["추가상담거부"] > 0 || hiddenCounts["블랙리스트"] > 0 || hiddenCounts["중복"] > 0) && (
+                <div className="flex gap-2 shrink-0 px-1">
+                  {(["추가상담거부", "블랙리스트", "중복"] as const).map(s => hiddenCounts[s] > 0 && (
+                    <button key={s} onClick={() => { setViewMode("list"); }}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusStyles[s].badge} hover:opacity-80 transition-opacity`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${statusStyles[s].dot}`} />
+                      {s}: {hiddenCounts[s]}건
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="flex-1 min-h-0">
+                <KanbanView grouped={groupedLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onSaveMemo={saveQuickMemo} draggingId={draggingId} setDraggingId={setDraggingId} dragOverStatus={dragOverStatus} setDragOverStatus={setDragOverStatus} doneTotalCounts={doneTotalCounts} kanbanDoneDays={kanbanDoneDays} onKanbanDoneDaysChange={setKanbanDoneDays} />
+              </div>
+            </div>
+          )}
           {(hasLoaded.current || !loading) && viewMode === "list" && <ListView leads={filteredLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} loading={loading} pagination={{ currentPage, pageSize, totalCount, totalPages, onPageChange: setCurrentPage, onPageSizeChange: setPageSize }} />}
           {(hasLoaded.current || !loading) && viewMode === "calendar" && <CalendarView events={calendarEvents} />}
         </div>

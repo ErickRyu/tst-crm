@@ -1,14 +1,14 @@
 "use client";
 
 import type { CrmStatus, KanbanProps } from "../types";
-import { statusOptions, statusStyles } from "../types";
+import { kanbanStatusOptions, statusStyles } from "../types";
 import { KanbanCard } from "./kanban-card";
 
 export function KanbanView({ grouped, users, onSelect, selectedId, onStatus, onSaveMemo, draggingId, setDraggingId, dragOverStatus, setDragOverStatus, doneTotalCounts, kanbanDoneDays, onKanbanDoneDaysChange }: KanbanProps) {
   const doneSet = new Set<CrmStatus>(["응대중", "통화완료", "예약완료"]);
   return (
     <div className="flex gap-2 h-full overflow-x-auto pb-4 items-start snap-x snap-mandatory md:gap-4 md:snap-none">
-      {statusOptions.map(status => {
+      {kanbanStatusOptions.map(status => {
         const isDone = doneSet.has(status);
         return (
         <div key={status} onDragOver={(e) => { e.preventDefault(); setDragOverStatus(status); }} onDragLeave={() => setDragOverStatus(null)} onDrop={() => { if (!draggingId) return; setDragOverStatus(null); onStatus(draggingId, status); setDraggingId(null); }}

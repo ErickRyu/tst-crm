@@ -8,9 +8,12 @@ export const ACTIONABLE_STATUSES: CrmStatus[] = [
   "3차부재",
   "노쇼",
   "신규인입",
+  "추후 통화희망",
 ];
 
 export const DONE_STATUSES: CrmStatus[] = ["응대중", "통화완료", "예약완료"];
+
+export const HIDDEN_STATUSES: CrmStatus[] = ["추가상담거부", "블랙리스트", "중복"];
 
 export const CRM_PRIORITY: Record<CrmStatus, number> = {
   "1차부재": 1,
