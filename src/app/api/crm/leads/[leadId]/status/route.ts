@@ -5,6 +5,7 @@ import { leads } from "@/lib/schema";
 import { canTransition, CrmStatus } from "@/lib/crm";
 import { crmStatusUpdateSchema } from "@/lib/validation";
 import { executeAutoSend } from "@/lib/auto-send";
+import { logActivity } from "@/lib/activity-log";
 
 type Params = { params: Promise<{ leadId: string }> };
 
@@ -83,6 +84,16 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         { status: 409 }
       );
     }
+
+    // Fire-and-forget: log activity
+    logActivity({
+      leadId: id,
+      action: "status_change",
+      actorName: parsed.data.actorName || "시스템",
+      oldValue: from,
+      newValue: to,
+      detail: `상태 변경: ${from} → ${to}`,
+    }).catch(console.error);
 
     // Fire-and-forget: auto-send for absent statuses
     const absentStatuses = ["1차부재", "2차부재", "3차부재"];
