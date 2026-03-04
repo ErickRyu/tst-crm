@@ -101,6 +101,17 @@ export const autoSendRules = pgTable("auto_send_rules", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const leadActivities = pgTable("lead_activities", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+  action: text("action").notNull(), // status_change | assign | schedule_appointment | schedule_follow_up | memo_save
+  actorName: text("actor_name").notNull(),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  detail: text("detail"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const crmSettings = pgTable("crm_settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),

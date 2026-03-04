@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { leads } from "@/lib/schema";
 import { crmScheduleUpdateSchema } from "@/lib/validation";
 import { executeAutoSend } from "@/lib/auto-send";
+import { logActivity } from "@/lib/activity-log";
 
 type Params = { params: Promise<{ leadId: string }> };
 
@@ -88,6 +89,29 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         { code: 409, message: "다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요." },
         { status: 409 }
       );
+    }
+
+    // Fire-and-forget: log activity for schedule changes
+    const fmtDt = (d: Date | null | undefined) => d ? d.toISOString() : "없음";
+    if (Object.prototype.hasOwnProperty.call(parsed.data, "followUpAt")) {
+      logActivity({
+        leadId: id,
+        action: "schedule_follow_up",
+        actorName: parsed.data.actorName || "시스템",
+        oldValue: null,
+        newValue: fmtDt(updates.followUpAt),
+        detail: updates.followUpAt ? `추후통화 설정: ${fmtDt(updates.followUpAt)}` : "추후통화 취소",
+      }).catch(console.error);
+    }
+    if (settingAppointment) {
+      logActivity({
+        leadId: id,
+        action: "schedule_appointment",
+        actorName: parsed.data.actorName || "시스템",
+        oldValue: fmtDt(prevAppointmentAt),
+        newValue: fmtDt(updates.appointmentAt),
+        detail: updates.appointmentAt ? `예약 설정: ${fmtDt(updates.appointmentAt)}` : "예약 취소",
+      }).catch(console.error);
     }
 
     // Fire-and-forget: auto-send for appointment_set (null → non-null)

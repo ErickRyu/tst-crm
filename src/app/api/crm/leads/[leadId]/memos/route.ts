@@ -3,6 +3,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { leads, leadMemos } from "@/lib/schema";
 import { memoCreateSchema } from "@/lib/validation";
+import { logActivity } from "@/lib/activity-log";
 
 type Params = { params: Promise<{ leadId: string }> };
 
@@ -71,6 +72,14 @@ export async function POST(request: NextRequest, { params }: Params) {
         .returning();
       memo = created;
     }
+
+    // Fire-and-forget: log activity
+    logActivity({
+      leadId: id,
+      action: "memo_save",
+      actorName: parsed.data.authorName,
+      detail: existing ? "메모 수정" : "메모 작성",
+    }).catch(console.error);
 
     return NextResponse.json({ code: 200, message: "메모가 저장되었습니다.", data: memo });
   } catch {

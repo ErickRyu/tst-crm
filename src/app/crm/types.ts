@@ -91,6 +91,16 @@ export interface SmsTemplate {
   isActive?: boolean;
 }
 
+export interface ActivityItem {
+  id: string;          // "activity-123" | "sms-456"
+  type: string;        // status_change | assign | schedule_appointment | memo_save | sms_sent
+  actorName: string;
+  detail: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  createdAt: string;
+}
+
 export interface PaginationProps {
   currentPage: number;
   pageSize: number;

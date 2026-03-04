@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import type { Lead, User, CrmStatus, LeadMemo, SmsTemplate } from "../types";
+import type { Lead, User, CrmStatus, LeadMemo, SmsTemplate, ActivityItem } from "../types";
 import { statusOptions, statusStyles, fmtCreatedAt, toIsoLocal } from "../types";
 import { PhoneLink, downloadVCard } from "./phone-link";
+import { ActivityTimeline } from "./activity-timeline";
 import { TagChip } from "./tag-chip";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,6 +39,8 @@ interface LeadDrawerProps {
   smsSending: boolean;
   smsTestMode: boolean;
   onSendSms: (msg: string, templateKey?: string) => void;
+  activities: ActivityItem[];
+  activitiesLoading: boolean;
 }
 
 export function LeadDrawer({
@@ -60,6 +63,8 @@ export function LeadDrawer({
   smsSending,
   smsTestMode,
   onSendSms,
+  activities,
+  activitiesLoading,
 }: LeadDrawerProps) {
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   const [smsMsg, setSmsMsg] = useState("");
@@ -342,6 +347,9 @@ export function LeadDrawer({
                   </div>
                 )}
               </div>
+
+              {/* Activity Timeline */}
+              <ActivityTimeline activities={activities} loading={activitiesLoading} />
             </>
           )}
         </div>

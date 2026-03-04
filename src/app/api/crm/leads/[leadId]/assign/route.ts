@@ -3,6 +3,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { leads, users } from "@/lib/schema";
 import { crmAssignSchema } from "@/lib/validation";
+import { logActivity } from "@/lib/activity-log";
 
 type Params = { params: Promise<{ leadId: string }> };
 
@@ -28,7 +29,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       );
     }
 
-    const { assigneeId, version } = parsed.data;
+    const { assigneeId, version, actorName } = parsed.data;
+
+    // Get previous assignee for logging
+    const [currentLead] = await db
+      .select({ assigneeId: leads.assigneeId })
+      .from(leads)
+      .where(eq(leads.id, id))
+      .limit(1);
+    const prevAssigneeId = currentLead?.assigneeId ?? null;
 
     if (assigneeId !== null) {
       const [assignee] = await db
@@ -65,6 +74,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         { status: 409 }
       );
     }
+
+    // Fire-and-forget: log activity
+    const allUsers = await db.select({ id: users.id, name: users.name }).from(users);
+    const userMap = new Map(allUsers.map(u => [u.id, u.name]));
+    const oldName = prevAssigneeId ? (userMap.get(prevAssigneeId) || "미배정") : "미배정";
+    const newName = assigneeId ? (userMap.get(assigneeId) || "미배정") : "미배정";
+    logActivity({
+      leadId: id,
+      action: "assign",
+      actorName: actorName || "시스템",
+      oldValue: oldName,
+      newValue: newName,
+      detail: `담당자 변경: ${oldName} → ${newName}`,
+    }).catch(console.error);
 
     return NextResponse.json({
       code: 200,

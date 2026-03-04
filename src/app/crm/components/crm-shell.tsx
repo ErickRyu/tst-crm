@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useLoading } from "../ui/loading-overlay";
-import type { ViewMode, Scope, CrmStatus, Lead, User, CalendarEvent, LeadMemo, SmsTemplate } from "../types";
+import type { ViewMode, Scope, CrmStatus, Lead, User, CalendarEvent, LeadMemo, SmsTemplate, ActivityItem } from "../types";
 import { statusOptions, kanbanStatusOptions, statusStyles } from "../types";
 import { KanbanView } from "./kanban-view";
 import { ListView } from "./list-view";
@@ -32,6 +32,8 @@ export function CrmShell() {
   const [memoInput, setMemoInput] = useState("");
   const [memoLoading, setMemoLoading] = useState(false);
   const [memoSaving, setMemoSaving] = useState(false);
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [smsTemplates, setSmsTemplates] = useState<SmsTemplate[]>([]);
   const [smsSending, setSmsSending] = useState(false);
   const [smsTestMode, setSmsTestMode] = useState(true);
@@ -190,6 +192,7 @@ export function CrmShell() {
         const memosRes = await fetch(`/api/crm/leads/${selectedLeadId}/memos`);
         const memosJson = await memosRes.json();
         if (memosRes.ok) setMemos(memosJson.data || []);
+        void fetchActivities(selectedLeadId);
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "SMS 발송 실패");
@@ -264,15 +267,37 @@ export function CrmShell() {
     }
   }, [selectedLeadId, apiKey]);
 
+  const fetchActivities = useCallback(async (id: number) => {
+    try {
+      setActivitiesLoading(true);
+      const res = await fetch(`/api/crm/leads/${id}/activities`);
+      const json = await res.json();
+      if (res.ok) setActivities((json.data || []) as ActivityItem[]);
+    } catch {
+      /* non-critical */
+    } finally {
+      setActivitiesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedLeadId) {
+      void fetchActivities(selectedLeadId);
+    } else {
+      setActivities([]);
+    }
+  }, [selectedLeadId, fetchActivities]);
+
   const updateStatus = async (id: number, status: CrmStatus) => {
     try {
       const version = leads.find(l => l.id === id)?.version;
       const res = await fetch(`/api/crm/leads/${id}/status`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ crmStatus: status, version }),
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ crmStatus: status, version, actorName: currentUser }),
       });
       if (res.ok) {
         toast.success("상태가 변경되었습니다.");
         await refreshAll();
+        if (selectedLeadId === id) void fetchActivities(id);
       } else if (res.status === 409) {
         setError("다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요.");
         toast.error("다른 상담원이 먼저 변경했습니다.");
@@ -287,11 +312,12 @@ export function CrmShell() {
     try {
       const version = leads.find(l => l.id === id)?.version;
       const res = await fetch(`/api/crm/leads/${id}/assign`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assigneeId, version }),
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assigneeId, version, actorName: currentUser }),
       });
       if (res.ok) {
         toast.success("담당자가 변경되었습니다.");
         await refreshAll();
+        if (selectedLeadId === id) void fetchActivities(id);
       } else if (res.status === 409) {
         setError("다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요.");
         toast.error("다른 상담원이 먼저 변경했습니다.");
@@ -303,11 +329,12 @@ export function CrmShell() {
     try {
       const version = leads.find(l => l.id === id)?.version;
       const res = await fetch(`/api/crm/leads/${id}/schedule`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [field]: value ? new Date(value).toISOString() : null, version }),
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [field]: value ? new Date(value).toISOString() : null, version, actorName: currentUser }),
       });
       if (res.ok) {
         toast.success("일정이 변경되었습니다.");
         await refreshAll();
+        if (selectedLeadId === id) void fetchActivities(id);
       } else if (res.status === 409) {
         setError("다른 상담원이 먼저 변경했습니다. 새로고침 후 다시 시도하세요.");
         toast.error("다른 상담원이 먼저 변경했습니다.");
@@ -335,6 +362,7 @@ export function CrmShell() {
       if (!res.ok) throw new Error(json.message || "메모 저장 실패");
       setMemos([json.data as LeadMemo]);
       toast.success("메모가 저장되었습니다.");
+      if (selectedLeadId) void fetchActivities(selectedLeadId);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "메모 저장 실패");
     } finally {
@@ -548,6 +576,8 @@ export function CrmShell() {
         smsSending={smsSending}
         smsTestMode={smsTestMode}
         onSendSms={(msg, templateKey) => selectedLeadId && sendSms(selectedLeadId, msg, templateKey)}
+        activities={activities}
+        activitiesLoading={activitiesLoading}
       />
 
       {error && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-2 rounded-full shadow-2xl z-50 flex items-center gap-2"><span className="material-icons">warning</span> {error} <button onClick={() => setError(null)}>✕</button></div>}
