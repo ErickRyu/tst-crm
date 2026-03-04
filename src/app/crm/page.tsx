@@ -321,7 +321,7 @@ function CrmShell() {
         if (!res.ok) throw new Error(json.message || "메모 조회 실패");
         const data = (json.data || []) as LeadMemo[];
         setMemos(data);
-        setMemoInput(data[0]?.body || "");
+        setMemoInput(data[0]?.body || "치아상태 :\n거주지 :\n갯수:");
       } catch (e) {
         pushToast(e instanceof Error ? e.message : "메모 조회 실패", "error");
       } finally {
@@ -870,25 +870,35 @@ function LeadDrawer({
   return (
     <>
       <div className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm" onClick={onClose}></div>
-      <aside className="fixed bottom-0 left-0 right-0 z-40 max-h-[90vh] w-full rounded-t-2xl md:top-0 md:bottom-auto md:left-auto md:right-0 md:h-full md:max-h-full md:w-[420px] md:rounded-none bg-white shadow-2xl flex flex-col">
+      <aside className="fixed bottom-0 left-0 right-0 z-40 max-h-[90vh] w-full rounded-t-2xl md:top-0 md:bottom-auto md:left-auto md:right-0 md:h-full md:max-h-full md:w-[480px] md:rounded-none bg-white shadow-2xl flex flex-col">
         {/* Mobile drag handle */}
         <div className="flex justify-center pt-2 pb-1 md:hidden"><div className="w-10 h-1 rounded-full bg-slate-300"></div></div>
-        {/* Header */}
-        <div className="p-4 md:p-6 border-b border-slate-100 flex justify-between items-start bg-white shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center text-primary font-bold text-xl shrink-0">{lead?.name?.[0] || "?"}</div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="font-bold text-lg">{lead?.name || (loading ? "불러오는 중..." : "데이터 없음")}</h2>
-                {lead?.crmStatus && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${statusStyles[lead.crmStatus]?.badge || ""}`}>{lead.crmStatus}</span>}
-              </div>
-              <div className="flex items-center gap-2 text-sm text-slate-500 mt-0.5">
-                <span className="material-icons text-[14px]">smartphone</span>
-                {lead?.phone ? <PhoneLink phone={lead.phone} /> : ""}
-              </div>
+        {/* 정보 영역 */}
+        <div className="p-4 md:px-8 md:py-4 border-b border-slate-100 bg-white shrink-0 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <h2 className="font-bold text-lg md:text-xl truncate">{lead?.name || (loading ? "불러오는 중..." : "데이터 없음")}</h2>
+              {lead && (
+                <select value={lead.crmStatus} onChange={e => onStatus(lead.id, e.target.value as CrmStatus)} className={`text-xs md:text-sm font-bold px-2 md:px-3 py-1 md:py-1.5 rounded border border-slate-200 focus:ring-1 focus:ring-primary ${statusStyles[lead.crmStatus]?.badge || ""}`}>
+                  {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              )}
+              {lead?.createdAt && <span className="text-xs md:text-sm text-slate-400 shrink-0">{fmtCreatedAt(lead.createdAt)}</span>}
             </div>
+            <button ref={closeBtnRef} onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2 -m-2 md:p-0 md:m-0 shrink-0 ml-2"><span className="material-icons">close</span></button>
           </div>
-          <button ref={closeBtnRef} onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2 -m-2 md:p-0 md:m-0"><span className="material-icons">close</span></button>
+          <div className="flex items-center gap-2 text-sm md:text-base text-slate-500">
+            <span className="material-icons text-[14px] md:text-[16px]">smartphone</span>
+            {lead?.phone ? <PhoneLink phone={lead.phone} /> : ""}
+          </div>
+          {lead && (
+            <div className="flex flex-wrap gap-1.5 md:gap-2">
+              {lead.age != null && <TagChip label={`${lead.age}세`} tone="blue" />}
+              {lead.gender && <TagChip label={lead.gender === "남" ? "남" : "여"} tone={lead.gender === "남" ? "blue" : "pink"} />}
+              {lead.media && <TagChip label={lead.media} tone="purple" />}
+              <TagChip label={lead.careTag} tone={lead.careTag.includes("임플란트") ? "indigo" : "slate"} />
+            </div>
+          )}
         </div>
 
         {/* Scrollable content */}
@@ -911,36 +921,19 @@ function LeadDrawer({
           )}
           {!loading && !error && lead && (
             <>
-              {/* Status & Assignment */}
-              <div className="p-4 space-y-4 md:p-6 md:space-y-6">
-                <section>
-                  <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">상태 변경</h4>
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${statusStyles[lead.crmStatus].dot}`}></span>
-                    <select value={lead.crmStatus} onChange={e => onStatus(lead.id, e.target.value as CrmStatus)} className={`flex-1 border border-slate-200 rounded-lg p-2.5 text-sm font-medium focus:ring-1 focus:ring-primary ${statusStyles[lead.crmStatus].badge}`}>
-                      {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                </section>
-                <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">담당 상담원</h4><select value={lead.assigneeId || ""} onChange={e => onAssignee(lead.id, Number(e.target.value) || null)} className="w-full border border-slate-200 rounded-lg p-2.5 text-sm">{users.map((u: User) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></section>
-                <section className="flex flex-wrap gap-1">
-                  {lead.age != null && <TagChip label={`${lead.age}세`} tone="blue" />}
-                  {lead.gender && <TagChip label={lead.gender === "남" ? "남" : "여"} tone={lead.gender === "남" ? "blue" : "pink"} />}
-                  {lead.media && <TagChip label={lead.media} tone="purple" />}
-                  <TagChip label={fmtCreatedAt(lead.createdAt)} tone="gray" />
-                  <TagChip label={lead.careTag} tone={lead.careTag.includes("임플란트") ? "indigo" : "slate"} />
-                </section>
-                <section><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">예약 확정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onBlur={e => onSchedule(lead.id, "appointmentAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-xs" /></section>
+              {/* 예약 확정 */}
+              <div className="p-4 md:px-8 md:py-3">
+                <section><h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-2">예약 확정</h4><input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onBlur={e => onSchedule(lead.id, "appointmentAt", e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 md:p-3 text-xs md:text-sm" /></section>
               </div>
 
               {/* SMS Send Area */}
-              <div className="p-4 bg-white border-t border-slate-200">
+              <div className="p-4 md:px-8 md:py-3 bg-white border-t border-slate-200">
                 <div className="relative">
                   <textarea
                     value={smsMsg}
                     onChange={(e) => setSmsMsg(e.target.value)}
                     maxLength={2000}
-                    rows={3}
+                    rows={4}
                     className="w-full bg-slate-50 border-none rounded-lg p-3 pr-12 text-sm text-slate-700 focus:ring-2 focus:ring-primary/20 resize-none placeholder-slate-400"
                     placeholder="메시지를 입력하세요... (전송: Enter)"
                     onKeyDown={(e) => {
@@ -1030,17 +1023,17 @@ function LeadDrawer({
               </div>
 
               {/* Staff Memos */}
-              <div className="p-4 border-t border-slate-200 bg-slate-50">
+              <div className="p-4 md:px-8 md:py-3 border-t border-slate-200 bg-slate-50">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="material-icons text-slate-400 text-sm">lock</span>
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">직원 메모 (내부용)</h4>
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">상담메모</h4>
                   <span className={`ml-auto text-[10px] ${memoInput.length > 1800 ? "text-red-500" : "text-slate-400"}`}>{memoInput.length}/2000</span>
                 </div>
                 <textarea
                   value={memoInput}
                   onChange={(e) => onMemoInput(e.target.value)}
                   maxLength={2000}
-                  rows={2}
+                  rows={5}
                   className="w-full border border-slate-200 rounded-lg p-3 text-sm resize-none focus:ring-primary/30 focus:outline-none bg-white"
                   placeholder="통화 특이사항을 기록하세요."
                   onKeyDown={(e) => {
