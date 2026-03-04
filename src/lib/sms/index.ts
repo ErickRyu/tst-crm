@@ -1,38 +1,23 @@
-import aligoapi from "aligoapi";
+import { AligoSmsProvider } from "./aligo-provider";
+import type {
+  SmsSendResult,
+  SmsTemplate,
+  SmsRemainingResult,
+  SmsHistoryRequest,
+  SmsHistoryResult,
+  SmsDetailRequest,
+  SmsDetailResult,
+  SmsCancelRequest,
+  SmsCancelResult,
+} from "./types";
 
-// ---------- Auth ----------
-function getAuthData() {
-  return {
-    key: process.env.ALIGO_API_KEY || "",
-    user_id: process.env.ALIGO_USER_ID || "",
-    testmode_yn: process.env.ALIGO_TESTMODE === "N" ? "N" : "Y", // default testmode ON
-  };
-}
+export type { SmsSendResult, SmsTemplate, SmsRemainingResult };
 
-const SENDER = process.env.ALIGO_SENDER || "";
-
-// ---------- Types ----------
-export interface SmsSendResult {
-  result_code: string; // "1" = success, "-" = failure
-  message: string;
-  msg_id: string;
-  success_cnt: number;
-  error_cnt: number;
-  msg_type: string;
-}
-
-export interface SmsTemplate {
-  key: string;
-  label: string;
-  icon: string;
-  body: string;
-  msgType: "SMS" | "LMS";
-  statuses?: string[]; // 추천되는 crmStatus 목록 (비어있으면 공통)
-}
+// ---------- Provider Singleton ----------
+const provider = new AligoSmsProvider();
 
 // ---------- Templates ----------
 export const SMS_TEMPLATES: SmsTemplate[] = [
-  // --- 상태별 추천 템플릿 ---
   {
     key: "new_lead",
     label: "신규 상담 안내",
@@ -81,7 +66,6 @@ export const SMS_TEMPLATES: SmsTemplate[] = [
     msgType: "LMS",
     statuses: ["예약완료"],
   },
-  // --- 공통 템플릿 ---
   {
     key: "directions",
     label: "오시는 길",
@@ -105,7 +89,7 @@ export const SMS_TEMPLATES: SmsTemplate[] = [
   },
 ];
 
-// ---------- Byte calculation utility ----------
+// ---------- Byte calculation ----------
 export function calcMsgType(msg: string): { byteLength: number; msgType: "SMS" | "LMS" } {
   let byteLength = 0;
   for (const ch of msg) {
@@ -114,7 +98,7 @@ export function calcMsgType(msg: string): { byteLength: number; msgType: "SMS" |
   return { byteLength, msgType: byteLength > 90 ? "LMS" : "SMS" };
 }
 
-// ---------- Send SMS ----------
+// ---------- Send SMS (backward-compatible) ----------
 export async function sendSms(params: {
   receiver: string;
   msg: string;
@@ -122,16 +106,6 @@ export async function sendSms(params: {
   title?: string;
   patientName?: string;
 }): Promise<SmsSendResult> {
-  const auth = getAuthData();
-
-  if (!auth.key || !auth.user_id) {
-    throw new Error("Aligo API 인증 정보가 설정되지 않았습니다.");
-  }
-  if (!SENDER) {
-    throw new Error("발신번호(ALIGO_SENDER)가 설정되지 않았습니다.");
-  }
-
-  // {고객명} and %고객명% 치환
   let msg = params.msg;
   if (params.patientName) {
     msg = msg.replace(/%고객명%/g, params.patientName);
@@ -142,37 +116,28 @@ export async function sendSms(params: {
   const { msgType: autoType } = calcMsgType(msg);
   const msgType = params.msgType || autoType;
 
-  // aligoapi expects Express-like req object
-  const req = {
-    headers: {} as Record<string, string>,
-    body: {
-      sender: SENDER,
-      receiver: params.receiver.replace(/-/g, ""), // 하이픈 제거
-      msg,
-      msg_type: msgType,
-      ...(msgType !== "SMS" && params.title ? { title: params.title } : {}),
-    },
-  };
-
-  const result = (await aligoapi.send(req, auth)) as unknown as SmsSendResult;
-  return result;
+  return provider.send({
+    receiver: params.receiver.replace(/-/g, ""),
+    msg,
+    msgType,
+    title: params.title,
+  });
 }
 
 // ---------- Remaining balance ----------
-export async function getRemaining(): Promise<{
-  result_code: string;
-  message: string;
-  SMS_CNT: string;
-  LMS_CNT: string;
-  MMS_CNT: string;
-}> {
-  const auth = getAuthData();
-  const req = { headers: {} as Record<string, string>, body: {} };
-  return aligoapi.remain(req, auth) as unknown as {
-    result_code: string;
-    message: string;
-    SMS_CNT: string;
-    LMS_CNT: string;
-    MMS_CNT: string;
-  };
+export async function getRemaining(): Promise<SmsRemainingResult> {
+  return provider.getRemaining();
+}
+
+// ---------- New APIs ----------
+export async function getSmsHistory(params?: SmsHistoryRequest): Promise<SmsHistoryResult> {
+  return provider.getHistory(params);
+}
+
+export async function getSmsDetail(params: SmsDetailRequest): Promise<SmsDetailResult> {
+  return provider.getDetail(params);
+}
+
+export async function cancelScheduledSms(params: SmsCancelRequest): Promise<SmsCancelResult> {
+  return provider.cancel(params);
 }
