@@ -25,7 +25,8 @@
       "mcp__vibe_kanban__update_issue",
       "Bash(tail:*)",
       "mcp__vibe_kanban__list_projects",
-      "mcp__vibe_kanban__list_organizations"
+      "mcp__vibe_kanban__list_organizations",
+      "Bash(npx shadcn@latest:*)"
     ]
   }
 }

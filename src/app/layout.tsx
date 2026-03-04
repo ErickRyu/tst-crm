@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-page-custom-font */
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { Toaster } from "@/components/ui/sonner";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -29,6 +30,7 @@ export default function RootLayout({
         className="antialiased font-[family-name:var(--font-sans)]"
       >
         {children}
+        <Toaster position="bottom-center" richColors />
       </body>
     </html>
   );

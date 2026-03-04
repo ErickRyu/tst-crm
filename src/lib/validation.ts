@@ -64,9 +64,13 @@ export const crmStatusValues = [
   "2차부재",
   "3차부재",
   "노쇼",
+  "추후 통화희망",
   "응대중",
   "통화완료",
   "예약완료",
+  "추가상담거부",
+  "블랙리스트",
+  "중복",
 ] as const;
 
 export const crmStatusSchema = z.enum(crmStatusValues);

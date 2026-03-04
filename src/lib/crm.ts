@@ -18,9 +18,13 @@ export const CRM_PRIORITY: Record<CrmStatus, number> = {
   "3차부재": 3,
   노쇼: 4,
   신규인입: 5,
-  응대중: 6,
-  통화완료: 7,
-  예약완료: 8,
+  "추후 통화희망": 6,
+  응대중: 7,
+  통화완료: 8,
+  예약완료: 9,
+  추가상담거부: 10,
+  블랙리스트: 11,
+  중복: 12,
 };
 
 function normalizeDate(value: Date | string): Date {

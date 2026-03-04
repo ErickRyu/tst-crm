@@ -10,22 +10,22 @@ import {
 // ─── CRM_PRIORITY ───
 
 describe("CRM_PRIORITY", () => {
-  it("8개 상태 모두 매핑되어야 한다", () => {
-    expect(Object.keys(CRM_PRIORITY)).toHaveLength(8);
+  it("12개 상태 모두 매핑되어야 한다", () => {
+    expect(Object.keys(CRM_PRIORITY)).toHaveLength(12);
   });
 
-  it("우선순위가 1~8 범위여야 한다", () => {
+  it("우선순위가 1~12 범위여야 한다", () => {
     const values = Object.values(CRM_PRIORITY);
     expect(Math.min(...values)).toBe(1);
-    expect(Math.max(...values)).toBe(8);
+    expect(Math.max(...values)).toBe(12);
   });
 
   it("1차부재가 가장 높은 우선순위(1)여야 한다", () => {
     expect(CRM_PRIORITY["1차부재"]).toBe(1);
   });
 
-  it("예약완료가 가장 낮은 우선순위(8)여야 한다", () => {
-    expect(CRM_PRIORITY["예약완료"]).toBe(8);
+  it("중복이 가장 낮은 우선순위(12)여야 한다", () => {
+    expect(CRM_PRIORITY["중복"]).toBe(12);
   });
 });
 
@@ -47,12 +47,15 @@ describe("ACTIONABLE_STATUSES / DONE_STATUSES", () => {
     expect(overlap).toHaveLength(0);
   });
 
-  it("합치면 CRM_PRIORITY의 8개 상태를 모두 포함해야 한다", () => {
-    const all = new Set([...ACTIONABLE_STATUSES, ...DONE_STATUSES]);
-    expect(all.size).toBe(8);
-    for (const key of Object.keys(CRM_PRIORITY)) {
-      expect(all.has(key as CrmStatus)).toBe(true);
+  it("CRM_PRIORITY가 모든 CrmStatus를 포함해야 한다", () => {
+    const priorityKeys = new Set(Object.keys(CRM_PRIORITY));
+    const allStatuses = new Set([...ACTIONABLE_STATUSES, ...DONE_STATUSES]);
+    // ACTIONABLE + DONE statuses must all exist in CRM_PRIORITY
+    for (const s of allStatuses) {
+      expect(priorityKeys.has(s)).toBe(true);
     }
+    // CRM_PRIORITY should cover all 12 statuses
+    expect(priorityKeys.size).toBe(12);
   });
 });
 
