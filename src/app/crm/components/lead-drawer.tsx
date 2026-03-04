@@ -203,8 +203,57 @@ export function LeadDrawer({
           )}
           {!loading && !error && lead && (
             <>
+              {/* Staff Memos */}
+              <div className="p-4 md:px-8 md:py-3 bg-slate-50">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="material-icons text-slate-400 text-sm">lock</span>
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">상담메모</h4>
+                  <span className={`ml-auto text-[10px] ${memoInput.length > 1800 ? "text-red-500" : "text-slate-400"}`}>{memoInput.length}/2000</span>
+                </div>
+                <Textarea
+                  value={memoInput}
+                  onChange={(e) => onMemoInput(e.target.value)}
+                  maxLength={2000}
+                  rows={5}
+                  className="bg-white resize-none min-h-[160px]"
+                  placeholder="통화 특이사항을 기록하세요."
+                  onKeyDown={(e) => {
+                    if (e.ctrlKey && e.key === "Enter") {
+                      e.preventDefault();
+                      onSaveMemo();
+                    }
+                  }}
+                />
+                <div className="flex justify-between mt-2">
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={handleWash}
+                    disabled={washing || !memoInput.trim()}
+                    className="bg-violet-50 text-violet-600 hover:bg-violet-100"
+                    title="자연어를 구조화 템플릿으로 변환"
+                  >
+                    <span className="material-icons text-[13px]">auto_fix_high</span> {washing ? "변환중..." : "워싱"}
+                  </Button>
+                  <Button
+                    size="xs"
+                    onClick={onSaveMemo}
+                    disabled={memoSaving}
+                  >
+                    {memoSaving ? "저장 중..." : "메모 저장"}
+                  </Button>
+                </div>
+                {memoLoading && <div className="text-sm text-slate-400 mt-2">메모를 불러오는 중...</div>}
+                {!memoLoading && memos.length > 0 && memos[0].updatedAt && (
+                  <div className="text-[11px] text-slate-400 mt-2">
+                    마지막 수정: {new Date(memos[0].updatedAt).toLocaleString()}
+                    {memos[0].version ? ` (v${memos[0].version})` : ""}
+                  </div>
+                )}
+              </div>
+
               {/* 예약 확정 */}
-              <div className="p-4 md:px-8 md:py-3">
+              <div className="p-4 md:px-8 md:py-3 border-t border-slate-200">
                 <section><h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-2">예약 확정</h4><Input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onBlur={e => onSchedule(lead.id, "appointmentAt", e.target.value)} className="text-xs md:text-sm" /></section>
               </div>
 
@@ -297,55 +346,6 @@ export function LeadDrawer({
                     </div>
                   );
                 })()}
-              </div>
-
-              {/* Staff Memos */}
-              <div className="p-4 md:px-8 md:py-3 border-t border-slate-200 bg-slate-50">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="material-icons text-slate-400 text-sm">lock</span>
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">상담메모</h4>
-                  <span className={`ml-auto text-[10px] ${memoInput.length > 1800 ? "text-red-500" : "text-slate-400"}`}>{memoInput.length}/2000</span>
-                </div>
-                <Textarea
-                  value={memoInput}
-                  onChange={(e) => onMemoInput(e.target.value)}
-                  maxLength={2000}
-                  rows={5}
-                  className="bg-white resize-none"
-                  placeholder="통화 특이사항을 기록하세요."
-                  onKeyDown={(e) => {
-                    if (e.ctrlKey && e.key === "Enter") {
-                      e.preventDefault();
-                      onSaveMemo();
-                    }
-                  }}
-                />
-                <div className="flex justify-between mt-2">
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    onClick={handleWash}
-                    disabled={washing || !memoInput.trim()}
-                    className="bg-violet-50 text-violet-600 hover:bg-violet-100"
-                    title="자연어를 구조화 템플릿으로 변환"
-                  >
-                    <span className="material-icons text-[13px]">auto_fix_high</span> {washing ? "변환중..." : "워싱"}
-                  </Button>
-                  <Button
-                    size="xs"
-                    onClick={onSaveMemo}
-                    disabled={memoSaving}
-                  >
-                    {memoSaving ? "저장 중..." : "메모 저장"}
-                  </Button>
-                </div>
-                {memoLoading && <div className="text-sm text-slate-400 mt-2">메모를 불러오는 중...</div>}
-                {!memoLoading && memos.length > 0 && memos[0].updatedAt && (
-                  <div className="text-[11px] text-slate-400 mt-2">
-                    마지막 수정: {new Date(memos[0].updatedAt).toLocaleString()}
-                    {memos[0].version ? ` (v${memos[0].version})` : ""}
-                  </div>
-                )}
               </div>
 
               {/* Activity Timeline */}
