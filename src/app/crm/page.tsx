@@ -163,6 +163,8 @@ function CrmShell() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [counselorOpen, setCounselorOpen] = useState(false);
+  const [excelMenuOpen, setExcelMenuOpen] = useState(false);
+  const [excelDownloading, setExcelDownloading] = useState(false);
   const hasLoaded = useRef(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const { pushToast } = useToast();
@@ -460,6 +462,40 @@ function CrmShell() {
     }
   }, [viewMode, loading]);
 
+  const downloadExcel = async (allWithDone: boolean) => {
+    setExcelDownloading(true);
+    setExcelMenuOpen(false);
+    try {
+      const params = new URLSearchParams();
+      if (allWithDone) {
+        params.set("includeDone", "true");
+      } else {
+        params.set("scope", scope);
+        if (scope === "mine" && selectedUserId) params.set("assigneeId", String(selectedUserId));
+        if (includeDone) params.set("includeDone", "true");
+      }
+      const res = await fetch(`/api/crm/leads/export?${params.toString()}`);
+      if (!res.ok) throw new Error("다운로드 실패");
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition");
+      const match = cd?.match(/filename="?([^"]+)"?/);
+      const filename = match ? decodeURIComponent(match[1]) : "CRM_리드목록.xlsx";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      pushToast("엑셀 다운로드 완료", "success");
+    } catch {
+      pushToast("엑셀 다운로드 실패", "error");
+    } finally {
+      setExcelDownloading(false);
+    }
+  };
+
   return (
     <FeedbackProvider>
       <div className="flex h-screen w-full bg-background overflow-hidden text-slate-900 font-[family-name:var(--font-sans)]">
@@ -533,6 +569,32 @@ function CrmShell() {
               )}
             </div>
             <div className="hidden md:flex"><Legend /></div>
+            {/* 엑셀 다운로드 */}
+            <div className="relative shrink-0">
+              <button
+                onClick={() => setExcelMenuOpen(!excelMenuOpen)}
+                disabled={excelDownloading}
+                className={`flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-3 py-2 text-xs font-medium transition-colors ${excelDownloading ? "opacity-60 cursor-not-allowed" : ""}`}
+              >
+                <span className="material-icons text-sm">{excelDownloading ? "hourglass_empty" : "download"}</span>
+                <span className="hidden sm:inline">{excelDownloading ? "다운로드 중..." : "엑셀"}</span>
+              </button>
+              {excelMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setExcelMenuOpen(false)} />
+                  <div className="absolute top-full right-0 mt-1 bg-white border border-border rounded-lg shadow-xl z-50 min-w-[180px] py-1">
+                    <button onClick={() => downloadExcel(false)} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
+                      <span className="material-icons text-sm text-emerald-600">filter_alt</span>
+                      현재 필터 다운로드
+                    </button>
+                    <button onClick={() => downloadExcel(true)} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
+                      <span className="material-icons text-sm text-blue-600">select_all</span>
+                      전체 리스트 (Archive 포함)
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </header>
 
