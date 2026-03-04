@@ -153,7 +153,6 @@ export default function CrmPage() {
 function CrmShell() {
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [scope, setScope] = useState<Scope>("all");
-  const [includeDone, setIncludeDone] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -199,14 +198,12 @@ function CrmShell() {
     if (scope !== "all") count++;
     if (dateFrom || dateTo) count++;
     if (sortOrder !== "desc") count++;
-    if (includeDone) count++;
     return count;
-  }, [scope, dateFrom, dateTo, sortOrder, includeDone]);
+  }, [scope, dateFrom, dateTo, sortOrder]);
 
   const resetFilters = useCallback(() => {
     setScope("all");
     setSelectedUserId(null);
-    setIncludeDone(false);
     setSortOrder("desc");
     setDateFrom("");
     setDateTo("");
@@ -222,7 +219,7 @@ function CrmShell() {
   // 필터 변경 시 페이지 리셋
   useEffect(() => {
     setCurrentPage(0);
-  }, [scope, includeDone, selectedUserId, sortOrder, dateFrom, dateTo, debouncedSearch, pageSize]);
+  }, [scope, selectedUserId, sortOrder, dateFrom, dateTo, debouncedSearch, pageSize]);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -238,7 +235,7 @@ function CrmShell() {
   const fetchLeads = useCallback(async () => {
     const qs = new URLSearchParams({
       scope,
-      includeDone: String(includeDone),
+      includeDone: "true",
       sortOrder
     });
     if (selectedUserId) {
@@ -272,7 +269,7 @@ function CrmShell() {
         setCurrentPage((json.meta.totalPages ?? 1) - 1);
       }
     }
-  }, [scope, includeDone, selectedUserId, sortOrder, dateFrom, dateTo, viewMode, currentPage, pageSize, debouncedSearch]);
+  }, [scope, selectedUserId, sortOrder, dateFrom, dateTo, viewMode, currentPage, pageSize, debouncedSearch]);
 
   const fetchCalendar = useCallback(async () => {
     const qs = new URLSearchParams();
@@ -564,7 +561,6 @@ function CrmShell() {
       } else {
         params.set("scope", scope);
         if (scope === "mine" && selectedUserId) params.set("assigneeId", String(selectedUserId));
-        if (includeDone) params.set("includeDone", "true");
       }
       const res = await fetch(`/api/crm/leads/export?${params.toString()}`);
       if (!res.ok) throw new Error("다운로드 실패");
@@ -741,10 +737,6 @@ function CrmShell() {
                   <span className="material-icons text-sm">swap_vert</span>
                   <span>{sortOrder === "desc" ? "최신순" : "오래된순"}</span>
                 </button>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={includeDone} onChange={e => setIncludeDone(e.target.checked)} className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4" />
-                  <span className="text-[11px] font-bold text-slate-500">완료 항목 포함</span>
-                </label>
               </div>
             </div>
 
