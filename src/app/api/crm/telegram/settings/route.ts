@@ -86,7 +86,9 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json({ code: 200, message: "텔레그램 설정이 저장되었습니다." });
-  } catch {
-    return NextResponse.json({ code: 400, message: "설정 저장 실패" }, { status: 400 });
+  } catch (err) {
+    console.error("[Telegram Settings PATCH]", err);
+    const msg = err instanceof Error ? err.message : "알 수 없는 오류";
+    return NextResponse.json({ code: 400, message: `설정 저장 실패: ${msg}` }, { status: 400 });
   }
 }
