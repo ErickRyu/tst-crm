@@ -96,6 +96,7 @@ export interface ActivityItem {
   type: string;        // status_change | assign | schedule_appointment | memo_save | sms_sent
   actorName: string;
   detail: string | null;
+  fullDetail?: string | null;
   oldValue: string | null;
   newValue: string | null;
   createdAt: string;
