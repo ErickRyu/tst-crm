@@ -6,6 +6,8 @@ import { statusOptions, statusStyles, fmtCreatedAt, toIsoLocal } from "../types"
 import { PhoneLink, downloadVCard } from "./phone-link";
 import { ActivityTimeline } from "./activity-timeline";
 import { TagChip } from "./tag-chip";
+import { SmsPhonePreview } from "./sms-phone-preview";
+import { calcMsgType } from "@/lib/sms-utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -66,9 +68,18 @@ export function LeadDrawer({
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   const [smsMsg, setSmsMsg] = useState("");
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [washing, setWashing] = useState(false);
+  const [clinicName, setClinicName] = useState("");
 
   const isOpen = !!(lead || loading || error);
+
+  useEffect(() => {
+    fetch("/api/crm/settings")
+      .then(r => r.json())
+      .then(json => { if (json.data?.clinic_name) setClinicName(json.data.clinic_name); })
+      .catch(() => {});
+  }, []);
 
   const handleWash = async () => {
     if (!memoInput.trim() || !lead) return;
@@ -102,6 +113,31 @@ export function LeadDrawer({
     setSmsMsg("");
   };
 
+  const resolveVariables = (msg: string): string => {
+    if (!lead) return msg;
+    let resolved = msg;
+    resolved = resolved.replace(/\{고객명\}/g, lead.name);
+    resolved = resolved.replace(/\{고객이름\}/g, lead.name);
+    resolved = resolved.replace(/%고객명%/g, lead.name);
+    if (lead.appointmentAt) {
+      const d = new Date(lead.appointmentAt);
+      if (!isNaN(d.getTime())) {
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const formatted = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        resolved = resolved.replace(/\{예약확정일시\}/g, formatted);
+      }
+    }
+    resolved = resolved.replace(/\{문의내용\}/g, lead.category || "");
+    if (clinicName) resolved = resolved.replace(/\{치과명\}/g, clinicName);
+    const today = new Date();
+    const pad2 = (n: number) => String(n).padStart(2, "0");
+    resolved = resolved.replace(/\{Today\}/g, `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`);
+    return resolved;
+  };
+
+  const previewMsg = resolveVariables(smsMsg);
+  const { byteLength: previewBytes, msgType: previewMsgType } = calcMsgType(previewMsg);
+
   const handleTemplateSelect = (tpl: SmsTemplate) => {
     if (!lead) { setSmsMsg(tpl.body); setQuickMenuOpen(false); return; }
     let msg = tpl.body;
@@ -120,6 +156,12 @@ export function LeadDrawer({
     }
     // {문의내용}
     msg = msg.replace(/\{문의내용\}/g, lead.category || "");
+    // {치과명}
+    if (clinicName) msg = msg.replace(/\{치과명\}/g, clinicName);
+    // {Today}
+    const today = new Date();
+    const pad2 = (n: number) => String(n).padStart(2, "0");
+    msg = msg.replace(/\{Today\}/g, `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`);
     setSmsMsg(msg);
     setQuickMenuOpen(false);
   };
@@ -279,6 +321,12 @@ export function LeadDrawer({
                     >
                       <span className="material-icons text-[14px]">bolt</span> 빠른 답변
                     </button>
+                    <button
+                      onClick={() => setPreviewOpen(!previewOpen)}
+                      className={`text-xs flex items-center gap-1 px-2 py-1 rounded border transition-colors ${previewOpen ? "bg-primary/10 text-primary border-primary/20" : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100"}`}
+                    >
+                      <span className="material-icons text-[14px]">smartphone</span> 미리보기
+                    </button>
                   </div>
                   <Button
                     size="sm"
@@ -327,6 +375,18 @@ export function LeadDrawer({
                     </div>
                   );
                 })()}
+
+                {/* Phone Preview */}
+                {previewOpen && (
+                  <div className="mt-3 py-3">
+                    <SmsPhonePreview
+                      message={previewMsg}
+                      msgType={previewMsgType}
+                      charCount={previewMsg.length}
+                      byteCount={previewBytes}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Activity Timeline */}
