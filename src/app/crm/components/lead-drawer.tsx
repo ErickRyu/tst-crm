@@ -205,7 +205,7 @@ export function LeadDrawer({
             {lead?.phone ? <PhoneLink phone={lead.phone} /> : ""}
             {lead?.phone && (
               <button
-                onClick={() => downloadVCard(lead.name, lead.phone)}
+                onClick={() => downloadVCard(lead.name, lead.phone, clinicName || undefined)}
                 className="text-slate-400 hover:text-primary transition-colors shrink-0 p-1 -m-1"
                 title="연락처 저장"
                 aria-label="연락처 저장"
