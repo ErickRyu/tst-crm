@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, gte, lte, or, SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { parseDateAsKST } from "@/lib/date";
 import { leads } from "@/lib/schema";
 
 export async function GET(request: NextRequest) {
@@ -20,8 +21,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const from = fromParam ? new Date(fromParam) : null;
-    const to = toParam ? new Date(toParam) : null;
+    const from = fromParam ? parseDateAsKST(fromParam) : null;
+    const to = toParam ? parseDateAsKST(toParam) : null;
     if ((from && Number.isNaN(from.getTime())) || (to && Number.isNaN(to.getTime()))) {
       return NextResponse.json(
         { code: 400, message: "from/to 날짜 형식이 유효하지 않습니다." },

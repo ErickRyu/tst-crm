@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { TIMEZONE } from "@/lib/date";
 
 interface Template {
   id: number;
@@ -112,7 +113,7 @@ export function TemplateEditor({ template, onSave, onCancel }: TemplateEditorPro
     .replace(/\{치과명\}/g, "OO치과")
     .replace(/\{예약확정일시\}/g, "2026-03-10 14:00")
     .replace(/\{상담사 전화번호\}/g, "010-1234-5678")
-    .replace(/\{Today\}/g, new Date().toISOString().slice(0, 10))
+    .replace(/\{Today\}/g, new Date().toLocaleDateString("ko-KR", { timeZone: TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\. /g, "-").replace(/\./g, ""))
     .replace(/%고객명%/g, "홍길동");
 
   return (

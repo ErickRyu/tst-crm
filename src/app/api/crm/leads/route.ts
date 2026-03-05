@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql, SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { parseDateAsKST } from "@/lib/date";
 import { leads, leadMemos } from "@/lib/schema";
 import {
   ACTIONABLE_STATUSES,
@@ -58,13 +59,13 @@ export async function GET(request: NextRequest) {
     const conditions: SQL[] = [];
 
     if (fromParam) {
-      const fromDate = new Date(fromParam);
+      const fromDate = parseDateAsKST(fromParam);
       if (!Number.isNaN(fromDate.getTime())) {
         conditions.push(gte(leads.createdAt, fromDate));
       }
     }
     if (toParam) {
-      const toDate = new Date(toParam);
+      const toDate = parseDateAsKST(toParam);
       if (!Number.isNaN(toDate.getTime())) {
         // to 날짜의 끝(다음날 자정)까지 포함
         toDate.setDate(toDate.getDate() + 1);
