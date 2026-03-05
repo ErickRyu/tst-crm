@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       .where(whereClause)
       .orderBy(asc(smsTemplates.sortOrder), asc(smsTemplates.id));
 
-    const data = templates.map((t) => {
+    const data = templates.map((t: typeof templates[number]) => {
       const { byteLength, msgType } = calcMsgType(t.body);
       return {
         id: t.id,

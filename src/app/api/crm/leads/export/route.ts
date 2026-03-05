@@ -66,17 +66,15 @@ export async function GET(request: NextRequest) {
 
     // 중복 제거 (LEFT JOIN으로 메모가 여러 개인 리드)
     const seen = new Set<number>();
-    const data = rows.reduce<
-      { lead: typeof leads.$inferSelect; memoBody: string | null; assigneeName: string | null }[]
-    >((acc, r) => {
+    const data: typeof rows = [];
+    for (const r of rows) {
       if (!seen.has(r.lead.id)) {
         seen.add(r.lead.id);
-        acc.push(r);
+        data.push(r);
       }
-      return acc;
-    }, []);
+    }
 
-    const excelData = data.map((r) => ({
+    const excelData = data.map((r: typeof rows[number]) => ({
       이름: r.lead.name || "",
       전화번호: r.lead.phone || "",
       나이: r.lead.age ?? "",

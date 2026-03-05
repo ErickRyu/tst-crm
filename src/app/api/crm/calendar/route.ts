@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     const where = conditions.length ? and(...conditions) : undefined;
     const rows = await db.select().from(leads).where(where);
 
-    const events = rows.flatMap((lead) => {
+    const events = rows.flatMap((lead: typeof rows[number]) => {
       const list = [] as Array<{
         id: string;
         leadId: number;
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
       return list;
     });
 
-    events.sort((a, b) => a.at.getTime() - b.at.getTime());
+    events.sort((a: (typeof events)[number], b: (typeof events)[number]) => a.at.getTime() - b.at.getTime());
 
     return NextResponse.json({
       code: 200,

@@ -30,7 +30,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
   ]);
 
   const timeline = [
-    ...activities.map((a) => ({
+    ...activities.map((a: typeof activities[number]) => ({
       id: `activity-${a.id}`,
       type: a.action,
       actorName: a.actorName,
@@ -40,7 +40,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
       newValue: a.newValue,
       createdAt: a.createdAt.toISOString(),
     })),
-    ...sms.map((s) => {
+    ...sms.map((s: typeof sms[number]) => {
       const prefix = `SMS ${s.status === "sent" ? "발송" : s.status === "test" ? "테스트 발송" : "실패"}: `;
       const summary = `${prefix}${s.body.slice(0, 50)}${s.body.length > 50 ? "..." : ""}`;
       const full = `${prefix}${s.body}`;

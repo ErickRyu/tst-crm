@@ -120,7 +120,6 @@ describe("sms module", () => {
       const result = await sendSms({
         receiver: "010-1234-5678",
         msg: "테스트 메시지",
-        senderName: "김상담",
       });
 
       expect(mockFetch).toHaveBeenCalledTimes(1);

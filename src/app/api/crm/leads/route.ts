@@ -129,13 +129,13 @@ export async function GET(request: NextRequest) {
 
     // LEFT JOIN으로 메모가 여러 개인 리드가 중복될 수 있으므로 첫 행만 사용
     const seen = new Set<number>();
-    const data = rows.reduce<ReturnType<typeof serializeLead>[]>((acc, r) => {
+    const data: ReturnType<typeof serializeLead>[] = [];
+    for (const r of rows) {
       if (!seen.has(r.lead.id)) {
         seen.add(r.lead.id);
-        acc.push(serializeLead(r.lead, r.memoBody));
+        data.push(serializeLead(r.lead, r.memoBody));
       }
-      return acc;
-    }, []);
+    }
 
     return NextResponse.json({
       code: 200,

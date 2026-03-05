@@ -77,9 +77,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     // Fire-and-forget: log activity
     const allUsers = await db.select({ id: users.id, name: users.name }).from(users);
-    const userMap = new Map(allUsers.map(u => [u.id, u.name]));
-    const oldName = prevAssigneeId ? (userMap.get(prevAssigneeId) || "미배정") : "미배정";
-    const newName = assigneeId ? (userMap.get(assigneeId) || "미배정") : "미배정";
+    const userMap = new Map<number, string>(allUsers.map((u: typeof allUsers[number]) => [u.id, u.name]));
+    const oldName: string = prevAssigneeId ? (userMap.get(prevAssigneeId) || "미배정") : "미배정";
+    const newName: string = assigneeId ? (userMap.get(assigneeId) || "미배정") : "미배정";
     logActivity({
       leadId: id,
       action: "assign",

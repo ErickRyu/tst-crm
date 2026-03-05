@@ -125,7 +125,7 @@ describe("GET /api/crm/leads/export", () => {
     const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { header: 1 });
 
     // 1행: 헤더
-    const headers = data[0] as string[];
+    const headers = data[0] as unknown as string[];
     expect(headers).toEqual(EXPECTED_HEADERS);
   });
 
