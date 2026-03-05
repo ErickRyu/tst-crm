@@ -2,15 +2,30 @@
 
 import { useState } from "react";
 
-export function downloadVCard(name: string, phone: string) {
-  const vcard = `BEGIN:VCARD\nVERSION:3.0\nFN:${name}\nTEL;TYPE=CELL:${phone}\nEND:VCARD`;
-  const blob = new Blob([vcard], { type: "text/vcard;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${name}.vcf`;
-  a.click();
-  URL.revokeObjectURL(url);
+export function downloadVCard(name: string, phone: string, clinicName?: string) {
+  const lines = [
+    "BEGIN:VCARD",
+    "VERSION:3.0",
+    `FN:${name}`,
+    `TEL;TYPE=CELL:${phone}`,
+  ];
+  if (clinicName) lines.push(`ORG:${clinicName}`);
+  lines.push(`NOTE:${clinicName ? clinicName + " " : ""}문의 환자`);
+  lines.push("END:VCARD");
+  const vcard = lines.join("\n");
+
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    window.location.href = "data:text/vcard;charset=utf-8," + encodeURIComponent(vcard);
+  } else {
+    const blob = new Blob([vcard], { type: "text/vcard;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${name}.vcf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 }
 
 export function PhoneLink({ phone, className = "" }: { phone: string; className?: string }) {
