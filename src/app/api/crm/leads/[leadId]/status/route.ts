@@ -7,6 +7,7 @@ import { crmStatusUpdateSchema } from "@/lib/validation";
 import { executeAutoSend } from "@/lib/auto-send";
 import { logActivity } from "@/lib/activity-log";
 import { notifyStatusChange } from "@/lib/telegram";
+import * as Sentry from "@sentry/nextjs";
 
 type Params = { params: Promise<{ leadId: string }> };
 
@@ -103,7 +104,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       from,
       to,
       actorName: parsed.data.actorName || "시스템",
-    }).catch(console.error);
+    }).catch((err) => {
+      console.error(err);
+      Sentry.captureException(err);
+    });
 
     // Fire-and-forget: auto-send for absent statuses
     const absentStatuses = ["1차부재", "2차부재", "3차부재"];

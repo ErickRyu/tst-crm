@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { crmSettings } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
+import * as Sentry from "@sentry/nextjs";
 
 interface TelegramSettings {
   botToken: string | null;
@@ -91,8 +92,15 @@ interface NewLeadData {
 
 export async function notifyNewLead(lead: NewLeadData): Promise<void> {
   const settings = await getTelegramSettings();
-  if (!settings.enabled || !settings.notifyNewLead) return;
-  if (!settings.botToken || !settings.chatId) return;
+
+  if (!settings.enabled || !settings.notifyNewLead) {
+    console.log("[Telegram] notifyNewLead skipped — enabled:", settings.enabled, "notifyNewLead:", settings.notifyNewLead);
+    return;
+  }
+  if (!settings.botToken || !settings.chatId) {
+    console.log("[Telegram] notifyNewLead skipped — missing botToken or chatId");
+    return;
+  }
 
   const text = [
     "🆕 <b>새 리드 인입</b>",
@@ -106,7 +114,9 @@ export async function notifyNewLead(lead: NewLeadData): Promise<void> {
 
   const result = await sendTelegramMessage(settings.botToken, settings.chatId, text);
   if (!result.ok) {
-    console.error("[Telegram] Failed to send new lead notification:", result.description);
+    const error = new Error(`[Telegram] Failed to send new lead notification: ${result.description}`);
+    console.error(error.message);
+    Sentry.captureException(error);
   }
 }
 
@@ -120,8 +130,15 @@ interface StatusChangeData {
 
 export async function notifyStatusChange(data: StatusChangeData): Promise<void> {
   const settings = await getTelegramSettings();
-  if (!settings.enabled || !settings.notifyStatusChange) return;
-  if (!settings.botToken || !settings.chatId) return;
+
+  if (!settings.enabled || !settings.notifyStatusChange) {
+    console.log("[Telegram] notifyStatusChange skipped — enabled:", settings.enabled, "notifyStatusChange:", settings.notifyStatusChange);
+    return;
+  }
+  if (!settings.botToken || !settings.chatId) {
+    console.log("[Telegram] notifyStatusChange skipped — missing botToken or chatId");
+    return;
+  }
 
   const text = [
     "🔄 <b>상태 변경</b>",
@@ -133,7 +150,9 @@ export async function notifyStatusChange(data: StatusChangeData): Promise<void> 
 
   const result = await sendTelegramMessage(settings.botToken, settings.chatId, text);
   if (!result.ok) {
-    console.error("[Telegram] Failed to send status change notification:", result.description);
+    const error = new Error(`[Telegram] Failed to send status change notification: ${result.description}`);
+    console.error(error.message);
+    Sentry.captureException(error);
   }
 }
 
