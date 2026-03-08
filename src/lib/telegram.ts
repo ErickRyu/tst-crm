@@ -21,32 +21,55 @@ const TELEGRAM_KEYS = [
 ] as const;
 
 export async function getTelegramSettings(): Promise<TelegramSettings> {
-  const allRows = await db
-    .select({ key: crmSettings.key, value: crmSettings.value })
-    .from(crmSettings);
+  const maxRetries = 2;
+  let lastError: unknown;
 
-  const map: Record<string, string> = {};
-  for (const row of allRows) {
-    if (row.key.startsWith("telegram_")) {
-      map[row.key] = row.value;
-    }
-  }
-
-  let botToken: string | null = null;
-  if (map.telegram_bot_token) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      botToken = decrypt(map.telegram_bot_token);
-    } catch {
-      botToken = null;
+      const allRows = await db
+        .select({ key: crmSettings.key, value: crmSettings.value })
+        .from(crmSettings);
+
+      const map: Record<string, string> = {};
+      for (const row of allRows) {
+        if (row.key.startsWith("telegram_")) {
+          map[row.key] = row.value;
+        }
+      }
+
+      let botToken: string | null = null;
+      if (map.telegram_bot_token) {
+        try {
+          botToken = decrypt(map.telegram_bot_token);
+        } catch {
+          botToken = null;
+        }
+      }
+
+      return {
+        botToken,
+        chatId: map.telegram_chat_id || null,
+        enabled: map.telegram_enabled === "1",
+        notifyNewLead: map.telegram_notify_new_lead !== "0",
+        notifyStatusChange: map.telegram_notify_status_change !== "0",
+      };
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+      }
     }
   }
 
+  Sentry.captureException(lastError, {
+    tags: { function: "getTelegramSettings", retries: maxRetries },
+  });
   return {
-    botToken,
-    chatId: map.telegram_chat_id || null,
-    enabled: map.telegram_enabled === "1",
-    notifyNewLead: map.telegram_notify_new_lead !== "0",
-    notifyStatusChange: map.telegram_notify_status_change !== "0",
+    botToken: null,
+    chatId: null,
+    enabled: false,
+    notifyNewLead: false,
+    notifyStatusChange: false,
   };
 }
 
