@@ -14,36 +14,47 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "비밀번호", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        try {
+          if (!credentials?.email || !credentials?.password) {
+            console.log("[AUTH] Missing credentials");
+            return null;
+          }
 
-        const email = credentials.email as string;
-        const password = credentials.password as string;
+          const email = credentials.email as string;
+          const password = credentials.password as string;
+          console.log("[AUTH] Attempting login for:", email);
 
-        const [user] = await db
-          .select()
-          .from(users)
-          .where(eq(users.email, email))
-          .limit(1);
+          const [user] = await db
+            .select()
+            .from(users)
+            .where(eq(users.email, email))
+            .limit(1);
 
-        if (!user || !user.passwordHash) return null;
-        if (user.status !== "ACTIVE") return null;
+          if (!user) { console.log("[AUTH] User not found"); return null; }
+          if (!user.passwordHash) { console.log("[AUTH] No password hash"); return null; }
+          if (user.status !== "ACTIVE") { console.log("[AUTH] User not active:", user.status); return null; }
 
-        const isValid = await bcrypt.compare(password, user.passwordHash);
-        if (!isValid) return null;
+          const isValid = await bcrypt.compare(password, user.passwordHash);
+          if (!isValid) { console.log("[AUTH] Invalid password"); return null; }
+          console.log("[AUTH] Login success for:", email);
 
-        // Update lastLoginAt
-        await db
-          .update(users)
-          .set({ lastLoginAt: new Date() })
-          .where(eq(users.id, user.id));
+          // Update lastLoginAt
+          await db
+            .update(users)
+            .set({ lastLoginAt: new Date() })
+            .where(eq(users.id, user.id));
 
-        return {
-          id: String(user.id),
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          forcePasswordChange: user.forcePasswordChange === 1,
-        };
+          return {
+            id: String(user.id),
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            forcePasswordChange: user.forcePasswordChange === 1,
+          };
+        } catch (err) {
+          console.error("[AUTH] Error in authorize:", err);
+          return null;
+        }
       },
     }),
   ],
