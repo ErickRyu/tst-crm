@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 
 export default function ChangePasswordPage() {
-  const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -39,9 +37,8 @@ export default function ChangePasswordPage() {
         return;
       }
 
-      // Re-login to refresh session token
-      await signOut({ redirect: false });
-      router.push("/login");
+      // Sign out and redirect to login (next-auth handles cookie clearing + redirect)
+      await signOut({ callbackUrl: "/login" });
     } catch {
       setError("비밀번호 변경 중 오류가 발생했습니다.");
     } finally {

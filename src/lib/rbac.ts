@@ -13,8 +13,7 @@ const PAGE_ROLES: Record<string, Role[]> = {
   "/crm/users": ["ADMIN"],
   "/crm/audit-logs": ["ADMIN"],
   "/crm/settings": ["ADMIN"],
-  "/crm/calendar": ["ADMIN", "COUNSELOR", "HOSPITAL_STAFF"],
-  "/crm": ["ADMIN", "COUNSELOR"],
+  "/crm": ["ADMIN", "COUNSELOR", "HOSPITAL_STAFF"],
 };
 
 export function canAccessPage(pathname: string, role: Role): boolean {
@@ -28,9 +27,9 @@ export function canAccessPage(pathname: string, role: Role): boolean {
       return roles.includes(role);
     }
   }
-  // Default: /crm and sub-paths require ADMIN or COUNSELOR
+  // Default: /crm and sub-paths accessible to all authenticated roles
   if (pathname.startsWith("/crm")) {
-    return role === "ADMIN" || role === "COUNSELOR";
+    return true;
   }
   return true;
 }
