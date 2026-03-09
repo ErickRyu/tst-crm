@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, date, primaryKey, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, date, jsonb } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -62,22 +62,16 @@ export const leads = pgTable("leads", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const leadMemos = pgTable(
-  "lead_memos",
-  {
-    id: serial("id").notNull(),
-    leadId: integer("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
-    authorId: integer("author_id").references(() => users.id),
-    authorName: text("author_name").notNull(),
-    body: text("body").notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-    version: integer("version").default(1).notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => ({
-    pk: primaryKey({ columns: [table.id] }),
-  })
-);
+export const leadMemos = pgTable("lead_memos", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+  authorId: integer("author_id").references(() => users.id),
+  authorName: text("author_name").notNull(),
+  body: text("body").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  version: integer("version").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
 
 export const smsLogs = pgTable("sms_logs", {
   id: serial("id").primaryKey(),
