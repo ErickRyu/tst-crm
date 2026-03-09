@@ -37,11 +37,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ code: 200, message: "채팅 감지 성공", data: result.chats });
     }
 
-    // 테스트 메시지 전송
-    const chat = chatId || settings?.chatId;
+    // 테스트 메시지 전송 — chatId 파라미터로 특정 수신자 테스트
+    const chat = chatId;
     if (!chat) {
       return NextResponse.json(
-        { code: 400, message: "저장된 Chat ID가 없습니다. 먼저 Chat ID를 설정해주세요." },
+        { code: 400, message: "테스트할 Chat ID를 지정해주세요." },
         { status: 400 }
       );
     }

@@ -117,3 +117,12 @@ export const crmSettings = pgTable("crm_settings", {
   value: text("value").notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+export const telegramRecipients = pgTable("telegram_recipients", {
+  id: serial("id").primaryKey(),
+  chatId: text("chat_id").notNull().unique(),
+  label: text("label").notNull(),
+  chatType: text("chat_type"),
+  isEnabled: integer("is_enabled").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

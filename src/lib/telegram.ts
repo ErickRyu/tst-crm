@@ -1,24 +1,26 @@
 import { db } from "@/lib/db";
-import { crmSettings } from "@/lib/schema";
-import { eq } from "drizzle-orm";
+import { crmSettings, telegramRecipients } from "@/lib/schema";
+import { eq, InferSelectModel } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
 import * as Sentry from "@sentry/nextjs";
 
+type TelegramRecipientRow = InferSelectModel<typeof telegramRecipients>;
+
+interface TelegramRecipient {
+  id: number;
+  chatId: string;
+  label: string;
+  chatType: string | null;
+  isEnabled: number;
+}
+
 interface TelegramSettings {
   botToken: string | null;
-  chatId: string | null;
+  recipients: TelegramRecipient[];
   enabled: boolean;
   notifyNewLead: boolean;
   notifyStatusChange: boolean;
 }
-
-const TELEGRAM_KEYS = [
-  "telegram_bot_token",
-  "telegram_chat_id",
-  "telegram_enabled",
-  "telegram_notify_new_lead",
-  "telegram_notify_status_change",
-] as const;
 
 export async function getTelegramSettings(): Promise<TelegramSettings> {
   const maxRetries = 2;
@@ -46,9 +48,19 @@ export async function getTelegramSettings(): Promise<TelegramSettings> {
         }
       }
 
+      const recipientRows: TelegramRecipientRow[] = await db
+        .select()
+        .from(telegramRecipients);
+
       return {
         botToken,
-        chatId: map.telegram_chat_id || null,
+        recipients: recipientRows.map((r: TelegramRecipientRow) => ({
+          id: r.id,
+          chatId: r.chatId,
+          label: r.label,
+          chatType: r.chatType,
+          isEnabled: r.isEnabled,
+        })),
         enabled: map.telegram_enabled === "1",
         notifyNewLead: map.telegram_notify_new_lead !== "0",
         notifyStatusChange: map.telegram_notify_status_change !== "0",
@@ -66,7 +78,7 @@ export async function getTelegramSettings(): Promise<TelegramSettings> {
   });
   return {
     botToken: null,
-    chatId: null,
+    recipients: [],
     enabled: false,
     notifyNewLead: false,
     notifyStatusChange: false,
@@ -127,6 +139,44 @@ function formatTime(date: Date | string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+async function sendToAllRecipients(
+  botToken: string,
+  recipients: TelegramRecipient[],
+  text: string,
+  context: string
+): Promise<void> {
+  const activeRecipients = recipients.filter((r) => r.isEnabled === 1);
+  if (activeRecipients.length === 0) {
+    console.log(`[Telegram] ${context} skipped — no active recipients`);
+    return;
+  }
+
+  const results = await Promise.allSettled(
+    activeRecipients.map((r) => sendTelegramMessage(botToken, r.chatId, text))
+  );
+
+  results.forEach((result, idx) => {
+    const recipient = activeRecipients[idx];
+    if (result.status === "rejected") {
+      const error = new Error(
+        `[Telegram] ${context} failed for "${recipient.label}" (${recipient.chatId}): ${result.reason}`
+      );
+      console.error(error.message);
+      Sentry.captureException(error, {
+        tags: { recipientLabel: recipient.label, chatId: recipient.chatId },
+      });
+    } else if (!result.value.ok) {
+      const error = new Error(
+        `[Telegram] ${context} failed for "${recipient.label}" (${recipient.chatId}): ${result.value.description}`
+      );
+      console.error(error.message);
+      Sentry.captureException(error, {
+        tags: { recipientLabel: recipient.label, chatId: recipient.chatId },
+      });
+    }
+  });
+}
+
 interface NewLeadData {
   id: number;
   name: string;
@@ -143,8 +193,8 @@ export async function notifyNewLead(lead: NewLeadData): Promise<void> {
     console.log("[Telegram] notifyNewLead skipped — enabled:", settings.enabled, "notifyNewLead:", settings.notifyNewLead);
     return;
   }
-  if (!settings.botToken || !settings.chatId) {
-    console.log("[Telegram] notifyNewLead skipped — missing botToken or chatId");
+  if (!settings.botToken || settings.recipients.length === 0) {
+    console.log("[Telegram] notifyNewLead skipped — missing botToken or no recipients");
     return;
   }
 
@@ -158,12 +208,7 @@ export async function notifyNewLead(lead: NewLeadData): Promise<void> {
     `🕐 시간: ${formatTime(lead.createdAt)}`,
   ].join("\n");
 
-  const result = await sendTelegramMessage(settings.botToken, settings.chatId, text);
-  if (!result.ok) {
-    const error = new Error(`[Telegram] Failed to send new lead notification: ${result.description}`);
-    console.error(error.message);
-    Sentry.captureException(error);
-  }
+  await sendToAllRecipients(settings.botToken, settings.recipients, text, "notifyNewLead");
 }
 
 interface StatusChangeData {
@@ -181,8 +226,8 @@ export async function notifyStatusChange(data: StatusChangeData): Promise<void> 
     console.log("[Telegram] notifyStatusChange skipped — enabled:", settings.enabled, "notifyStatusChange:", settings.notifyStatusChange);
     return;
   }
-  if (!settings.botToken || !settings.chatId) {
-    console.log("[Telegram] notifyStatusChange skipped — missing botToken or chatId");
+  if (!settings.botToken || settings.recipients.length === 0) {
+    console.log("[Telegram] notifyStatusChange skipped — missing botToken or no recipients");
     return;
   }
 
@@ -194,12 +239,7 @@ export async function notifyStatusChange(data: StatusChangeData): Promise<void> 
     `🙋 담당: ${data.actorName}`,
   ].join("\n");
 
-  const result = await sendTelegramMessage(settings.botToken, settings.chatId, text);
-  if (!result.ok) {
-    const error = new Error(`[Telegram] Failed to send status change notification: ${result.description}`);
-    console.error(error.message);
-    Sentry.captureException(error);
-  }
+  await sendToAllRecipients(settings.botToken, settings.recipients, text, "notifyStatusChange");
 }
 
 export async function testTelegramConnection(
