@@ -23,9 +23,8 @@ export default function LoginPage() {
         redirect: false,
       });
 
-      console.log("signIn result:", JSON.stringify(result));
       if (result?.error) {
-        setError(`로그인 실패: ${result.error} (status: ${result.status})`);
+        setError("이메일 또는 비밀번호가 올바르지 않습니다.");
       } else {
         router.push("/crm");
         router.refresh();
