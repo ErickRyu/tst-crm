@@ -73,24 +73,52 @@ export async function getTelegramSettings(): Promise<TelegramSettings> {
   };
 }
 
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function sendTelegramMessage(
   botToken: string,
   chatId: string,
   text: string
 ): Promise<{ ok: boolean; description?: string }> {
-  const res = await fetch(
-    `https://api.telegram.org/bot${botToken}/sendMessage`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        parse_mode: "HTML",
-      }),
+  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+  const options: RequestInit = {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: "HTML",
+    }),
+  };
+
+  const maxRetries = 2;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetchWithTimeout(url, options, 8000);
+      return await res.json();
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      }
     }
-  );
-  return res.json();
+  }
+
+  throw lastError;
 }
 
 function maskPhone(phone: string): string {
@@ -199,8 +227,10 @@ interface TelegramChat {
 export async function detectChatIds(
   botToken: string
 ): Promise<{ ok: boolean; chats: TelegramChat[]; description?: string }> {
-  const res = await fetch(
-    `https://api.telegram.org/bot${botToken}/getUpdates?limit=100`
+  const res = await fetchWithTimeout(
+    `https://api.telegram.org/bot${botToken}/getUpdates?limit=100`,
+    {},
+    8000
   );
   const data = await res.json();
 
