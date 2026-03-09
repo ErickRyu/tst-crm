@@ -121,11 +121,6 @@ export async function sendTelegramMessage(
   throw lastError;
 }
 
-function maskPhone(phone: string): string {
-  if (phone.length < 7) return phone;
-  return phone.slice(0, 3) + "-****-" + phone.slice(-4);
-}
-
 function formatTime(date: Date | string): string {
   const d = new Date(date);
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -157,7 +152,7 @@ export async function notifyNewLead(lead: NewLeadData): Promise<void> {
     "🆕 <b>새 리드 인입</b>",
     "",
     `👤 이름: ${lead.name}`,
-    `📱 연락처: ${maskPhone(lead.phone)}`,
+    `📱 연락처: ${lead.phone}`,
     `📋 문의: ${lead.category}`,
     `🌐 사이트: ${lead.site}`,
     `🕐 시간: ${formatTime(lead.createdAt)}`,
