@@ -3,8 +3,12 @@ import { db } from "@/lib/db";
 import { crmSettings } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { crmSettingsUpdateSchema } from "@/lib/validation";
+import { requireAuth } from "@/lib/auth-helpers";
 
 export async function GET() {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   try {
     const rows = await db.select().from(crmSettings);
     const settings: Record<string, string> = {};
@@ -18,6 +22,9 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
+  const authResult = await requireAuth(["ADMIN"]);
+  if (authResult.error) return authResult.error;
+
   try {
     const body = await request.json();
     const parsed = crmSettingsUpdateSchema.safeParse(body);

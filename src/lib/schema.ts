@@ -1,10 +1,28 @@
-import { pgTable, serial, text, integer, timestamp, date, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, date, primaryKey, jsonb } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   phone: text("phone"),
+  email: text("email").unique(),
+  passwordHash: text("password_hash"),
+  role: text("role").default("COUNSELOR").notNull(), // ADMIN | COUNSELOR | HOSPITAL_STAFF
+  status: text("status").default("ACTIVE").notNull(), // ACTIVE | INACTIVE
+  forcePasswordChange: integer("force_password_change").default(1).notNull(),
+  lastLoginAt: timestamp("last_login_at"),
   isActive: integer("is_active").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  action: text("action").notNull(),
+  targetType: text("target_type"),
+  targetId: text("target_id"),
+  details: jsonb("details"),
+  ipAddress: text("ip_address"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -40,6 +58,7 @@ export const leads = pgTable("leads", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   version: integer("version").default(1).notNull(),
   contactFailCount: integer("contact_fail_count").default(0),
+  createdBy: integer("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -48,6 +67,7 @@ export const leadMemos = pgTable(
   {
     id: serial("id").notNull(),
     leadId: integer("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    authorId: integer("author_id").references(() => users.id),
     authorName: text("author_name").notNull(),
     body: text("body").notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -105,6 +125,7 @@ export const leadActivities = pgTable("lead_activities", {
   id: serial("id").primaryKey(),
   leadId: integer("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
   action: text("action").notNull(), // status_change | assign | schedule_appointment | schedule_follow_up | memo_save
+  actorId: integer("actor_id").references(() => users.id),
   actorName: text("actor_name").notNull(),
   oldValue: text("old_value"),
   newValue: text("new_value"),

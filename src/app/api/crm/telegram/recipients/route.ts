@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { telegramRecipients } from "@/lib/schema";
+import { requireAuth } from "@/lib/auth-helpers";
 
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth(["ADMIN"]);
+  if (authResult.error) return authResult.error;
+
   try {
     const body = await request.json();
     const { chatId, label, chatType } = body;

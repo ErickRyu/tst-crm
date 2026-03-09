@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { useLoading } from "../ui/loading-overlay";
 import type { ViewMode, Scope, CrmStatus, Lead, User, CalendarEvent, LeadMemo, SmsTemplate, ActivityItem } from "../types";
@@ -17,6 +18,7 @@ import { CrmSidebar } from "./sidebar";
 
 export function CrmShell() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [scope, setScope] = useState<Scope>("all");
   const [users, setUsers] = useState<User[]>([]);
@@ -56,7 +58,10 @@ export function CrmShell() {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const { start: startLoading, stop: stopLoading } = useLoading();
   const apiKey = process.env.NEXT_PUBLIC_API_KEY || "";
-  const currentUser = process.env.NEXT_PUBLIC_USER_NAME || "상담원";
+  const authEnabled = process.env.NEXT_PUBLIC_AUTH_ENABLED !== "false";
+  const currentUser = authEnabled
+    ? (session?.user?.name || "상담원")
+    : (process.env.NEXT_PUBLIC_USER_NAME || "상담원");
   const [pollTick, setPollTick] = useState(0);
 
   const activeFilterCount = useMemo(() => {

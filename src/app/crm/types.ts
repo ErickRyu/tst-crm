@@ -33,6 +33,9 @@ export const kanbanStatusOptions: CrmStatus[] = [
 export interface User {
   id: number;
   name: string;
+  email?: string;
+  role?: "ADMIN" | "COUNSELOR" | "HOSPITAL_STAFF";
+  status?: "ACTIVE" | "INACTIVE";
 }
 
 export interface Lead {

@@ -4,10 +4,14 @@ import { db } from "@/lib/db";
 import { leads, users } from "@/lib/schema";
 import { crmAssignSchema } from "@/lib/validation";
 import { logActivity } from "@/lib/activity-log";
+import { requireAuth } from "@/lib/auth-helpers";
 
 type Params = { params: Promise<{ leadId: string }> };
 
 export async function PATCH(request: NextRequest, { params }: Params) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   const { leadId } = await params;
   const id = Number.parseInt(leadId, 10);
 
@@ -83,7 +87,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     logActivity({
       leadId: id,
       action: "assign",
-      actorName: actorName || "시스템",
+      actorName: authResult.user.name,
       oldValue: oldName,
       newValue: newName,
       detail: `담당자 변경: ${oldName} → ${newName}`,

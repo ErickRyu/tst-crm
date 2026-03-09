@@ -2,6 +2,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import { Providers } from "./providers";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -29,8 +30,10 @@ export default function RootLayout({
       <body
         className="antialiased font-[family-name:var(--font-sans)]"
       >
-        {children}
-        <Toaster position="bottom-center" richColors />
+        <Providers>
+          {children}
+          <Toaster position="bottom-center" richColors />
+        </Providers>
       </body>
     </html>
   );

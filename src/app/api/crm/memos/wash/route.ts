@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth-helpers";
 
 /**
  * POST /api/crm/memos/wash
@@ -6,6 +7,8 @@ import { NextRequest, NextResponse } from "next/server";
  * 향후 LLM API 연동 시 이 엔드포인트를 교체하면 됩니다.
  */
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
   try {
     const { raw, patientName, phone } = await request.json();
 

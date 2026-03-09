@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { leads, leadMemos, users } from "@/lib/schema";
 import { ACTIONABLE_STATUSES } from "@/lib/crm";
 import { TIMEZONE } from "@/lib/date";
+import { requireAuth } from "@/lib/auth-helpers";
 import * as XLSX from "xlsx";
 
 function parseBoolean(value: string | null, fallback: boolean) {
@@ -26,6 +27,9 @@ function formatDateOnly(d: Date | string | null): string {
 }
 
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   try {
     const { searchParams } = new URL(request.url);
 

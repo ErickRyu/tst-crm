@@ -5,6 +5,7 @@ import { leads } from "@/lib/schema";
 import { crmScheduleUpdateSchema } from "@/lib/validation";
 import { executeAutoSend } from "@/lib/auto-send";
 import { logActivity } from "@/lib/activity-log";
+import { requireAuth } from "@/lib/auth-helpers";
 
 type Params = { params: Promise<{ leadId: string }> };
 
@@ -16,6 +17,9 @@ function parseDateTime(value: string | null | undefined) {
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   const { leadId } = await params;
   const id = Number.parseInt(leadId, 10);
 
@@ -97,7 +101,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       logActivity({
         leadId: id,
         action: "schedule_follow_up",
-        actorName: parsed.data.actorName || "시스템",
+        actorName: authResult.user.name,
         oldValue: null,
         newValue: fmtDt(updates.followUpAt),
         detail: updates.followUpAt ? `추후통화 설정: ${fmtDt(updates.followUpAt)}` : "추후통화 취소",
@@ -107,7 +111,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       logActivity({
         leadId: id,
         action: "schedule_appointment",
-        actorName: parsed.data.actorName || "시스템",
+        actorName: authResult.user.name,
         oldValue: fmtDt(prevAppointmentAt),
         newValue: fmtDt(updates.appointmentAt),
         detail: updates.appointmentAt ? `예약 설정: ${fmtDt(updates.appointmentAt)}` : "예약 취소",

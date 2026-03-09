@@ -78,7 +78,7 @@ export const crmStatusSchema = z.enum(crmStatusValues);
 export const crmStatusUpdateSchema = z.object({
   crmStatus: crmStatusSchema,
   version: z.number().int().positive().optional(),
-  actorName: z.string().min(1).max(50).optional(),
+  actorName: z.string().max(50).optional(),
 });
 
 const isoDateTime = z
@@ -90,17 +90,17 @@ export const crmScheduleUpdateSchema = z.object({
   followUpAt: z.union([isoDateTime, z.null()]).optional(),
   appointmentAt: z.union([isoDateTime, z.null()]).optional(),
   version: z.number().int().positive().optional(),
-  actorName: z.string().min(1).max(50).optional(),
+  actorName: z.string().max(50).optional(),
 });
 
 export const crmAssignSchema = z.object({
   assigneeId: z.number().int().positive().nullable(),
   version: z.number().int().positive().optional(),
-  actorName: z.string().min(1).max(50).optional(),
+  actorName: z.string().max(50).optional(),
 });
 
 export const memoCreateSchema = z.object({
-  authorName: z.string().min(1).max(50),
+  authorName: z.string().max(50).optional(),
   body: z.string().min(1).max(2000),
 });
 

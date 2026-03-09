@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { crmSettings, telegramRecipients } from "@/lib/schema";
 import { eq, InferSelectModel } from "drizzle-orm";
 import { encrypt, decrypt } from "@/lib/crypto";
+import { requireAuth } from "@/lib/auth-helpers";
 
 type TelegramRecipientRow = InferSelectModel<typeof telegramRecipients>;
 
@@ -25,6 +26,9 @@ function maskToken(token: string): string {
 }
 
 export async function GET() {
+  const authResult = await requireAuth(["ADMIN"]);
+  if (authResult.error) return authResult.error;
+
   try {
     const rows = await db.select().from(crmSettings);
     const result: Record<string, string> = {};
@@ -66,6 +70,9 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
+  const authResult = await requireAuth(["ADMIN"]);
+  if (authResult.error) return authResult.error;
+
   try {
     const body = await request.json();
     if (typeof body !== "object" || body === null) {

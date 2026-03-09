@@ -3,8 +3,12 @@ import { and, eq, gte, lte, or, SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { parseDateAsKST } from "@/lib/date";
 import { leads } from "@/lib/schema";
+import { requireAuth } from "@/lib/auth-helpers";
 
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   try {
     const { searchParams } = new URL(request.url);
     const assigneeIdParam = searchParams.get("assigneeId");

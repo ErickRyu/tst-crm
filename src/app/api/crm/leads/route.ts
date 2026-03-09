@@ -3,6 +3,7 @@ import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql, SQL } from "driz
 import { db } from "@/lib/db";
 import { parseDateAsKST } from "@/lib/date";
 import { leads, leadMemos } from "@/lib/schema";
+import { requireAuth } from "@/lib/auth-helpers";
 import {
   ACTIONABLE_STATUSES,
   CRM_PRIORITY,
@@ -36,6 +37,9 @@ function serializeLead(row: typeof leads.$inferSelect, memoBody: string | null) 
 }
 
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   try {
     const { searchParams } = new URL(request.url);
 

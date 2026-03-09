@@ -47,7 +47,22 @@
       "mcp__vibe_kanban__list_organizations",
       "Skill(commit-commands:commit)",
       "Bash(git:*)",
-      "Bash(gh api:*)"
+      "Bash(gh api:*)",
+      "mcp__sentry__find_organizations",
+      "mcp__sentry__find_projects",
+      "mcp__sentry__search_issues",
+      "mcp__sentry__get_issue_details",
+      "mcp__sentry__update_issue",
+      "WebFetch(domain:www.flarelane.co.kr)",
+      "WebFetch(domain:blog.flarelane.co.kr)",
+      "WebFetch(domain:practicenumbers.com)",
+      "WebFetch(domain:www.arini.ai)",
+      "WebFetch(domain:semaconsulting.co.kr)",
+      "WebFetch(domain:blog.effic.biz)",
+      "Bash(npm view:*)",
+      "Bash(NEXT_DISABLE_TURBOPACK=1 npx next:*)",
+      "Bash(lsof:*)",
+      "Bash(kill 66699:*)"
     ]
   }
 }
