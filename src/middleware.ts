@@ -105,7 +105,10 @@ export async function middleware(request: NextRequest) {
   if (!pathname.startsWith("/api/")) {
     const role = token.role as Role;
     if (role && !canAccessPage(pathname, role)) {
-      return NextResponse.redirect(new URL("/crm", request.url));
+      const fallback = role === "HOSPITAL_STAFF" ? "/crm/calendar" : "/crm";
+      if (pathname !== fallback) {
+        return NextResponse.redirect(new URL(fallback, request.url));
+      }
     }
   }
 

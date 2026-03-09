@@ -50,6 +50,7 @@ interface LeadDrawerProps {
   onSendSms: (msg: string, templateKey?: string) => void;
   activities: ActivityItem[];
   activitiesLoading: boolean;
+  readOnly?: boolean;
 }
 
 export function LeadDrawer({
@@ -73,6 +74,7 @@ export function LeadDrawer({
   onSendSms,
   activities,
   activitiesLoading,
+  readOnly,
 }: LeadDrawerProps) {
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   const [smsMsg, setSmsMsg] = useState("");
@@ -186,7 +188,7 @@ export function LeadDrawer({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <SheetTitle className="font-bold text-lg md:text-xl truncate">{lead?.name || (loading ? "불러오는 중..." : "데이터 없음")}</SheetTitle>
-              {lead && (
+              {lead && !readOnly && (
                 <Select value={lead.crmStatus} onValueChange={(v) => onStatus(lead.id, v as CrmStatus)}>
                   <SelectTrigger className={`h-7 w-auto text-xs font-bold ${statusStyles[lead.crmStatus]?.badge || ""}`}>
                     <SelectValue />
@@ -195,6 +197,9 @@ export function LeadDrawer({
                     {statusOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
+              )}
+              {lead && readOnly && (
+                <span className={`h-7 inline-flex items-center px-2 text-xs font-bold rounded ${statusStyles[lead.crmStatus]?.badge || ""}`}>{lead.crmStatus}</span>
               )}
               {lead?.createdAt && <span className="text-xs md:text-sm text-slate-400 shrink-0">{fmtCreatedAt(lead.createdAt)}</span>}
             </div>
@@ -249,57 +254,85 @@ export function LeadDrawer({
                 <div className="flex items-center gap-2 mb-3">
                   <span className="material-icons text-slate-400 text-sm">lock</span>
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">상담메모</h4>
-                  <span className={`ml-auto text-[10px] ${memoInput.length > 1800 ? "text-red-500" : "text-slate-400"}`}>{memoInput.length}/2000</span>
+                  {!readOnly && <span className={`ml-auto text-[10px] ${memoInput.length > 1800 ? "text-red-500" : "text-slate-400"}`}>{memoInput.length}/2000</span>}
                 </div>
-                <Textarea
-                  value={memoInput}
-                  onChange={(e) => onMemoInput(e.target.value)}
-                  maxLength={2000}
-                  rows={5}
-                  className="bg-white resize-none min-h-[160px]"
-                  placeholder="통화 특이사항을 기록하세요."
-                  onKeyDown={(e) => {
-                    if (e.ctrlKey && e.key === "Enter") {
-                      e.preventDefault();
-                      onSaveMemo();
-                    }
-                  }}
-                />
-                <div className="flex justify-between mt-2">
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    onClick={handleWash}
-                    disabled={washing || !memoInput.trim()}
-                    className="bg-violet-50 text-violet-600 hover:bg-violet-100"
-                    title="자연어를 구조화 템플릿으로 변환"
-                  >
-                    <span className="material-icons text-[13px]">auto_fix_high</span> {washing ? "변환중..." : "워싱"}
-                  </Button>
-                  <Button
-                    size="xs"
-                    onClick={onSaveMemo}
-                    disabled={memoSaving}
-                  >
-                    {memoSaving ? "저장 중..." : "메모 저장"}
-                  </Button>
-                </div>
-                {memoLoading && <div className="text-sm text-slate-400 mt-2">메모를 불러오는 중...</div>}
-                {!memoLoading && memos.length > 0 && memos[0].updatedAt && (
-                  <div className="text-[11px] text-slate-400 mt-2">
-                    마지막 수정: {new Date(memos[0].updatedAt).toLocaleString()}
-                    {memos[0].version ? ` (v${memos[0].version})` : ""}
-                  </div>
+                {readOnly ? (
+                  <>
+                    {memoLoading && <div className="text-sm text-slate-400">메모를 불러오는 중...</div>}
+                    {!memoLoading && memos.length > 0 && (
+                      <div className="bg-white rounded-lg p-3 text-sm text-slate-700 whitespace-pre-wrap border border-slate-200">{memos[0].body}</div>
+                    )}
+                    {!memoLoading && memos.length === 0 && (
+                      <div className="text-sm text-slate-400">메모가 없습니다.</div>
+                    )}
+                    {!memoLoading && memos.length > 0 && memos[0].updatedAt && (
+                      <div className="text-[11px] text-slate-400 mt-2">
+                        마지막 수정: {new Date(memos[0].updatedAt).toLocaleString()}
+                        {memos[0].version ? ` (v${memos[0].version})` : ""}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Textarea
+                      value={memoInput}
+                      onChange={(e) => onMemoInput(e.target.value)}
+                      maxLength={2000}
+                      rows={5}
+                      className="bg-white resize-none min-h-[160px]"
+                      placeholder="통화 특이사항을 기록하세요."
+                      onKeyDown={(e) => {
+                        if (e.ctrlKey && e.key === "Enter") {
+                          e.preventDefault();
+                          onSaveMemo();
+                        }
+                      }}
+                    />
+                    <div className="flex justify-between mt-2">
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={handleWash}
+                        disabled={washing || !memoInput.trim()}
+                        className="bg-violet-50 text-violet-600 hover:bg-violet-100"
+                        title="자연어를 구조화 템플릿으로 변환"
+                      >
+                        <span className="material-icons text-[13px]">auto_fix_high</span> {washing ? "변환중..." : "워싱"}
+                      </Button>
+                      <Button
+                        size="xs"
+                        onClick={onSaveMemo}
+                        disabled={memoSaving}
+                      >
+                        {memoSaving ? "저장 중..." : "메모 저장"}
+                      </Button>
+                    </div>
+                    {memoLoading && <div className="text-sm text-slate-400 mt-2">메모를 불러오는 중...</div>}
+                    {!memoLoading && memos.length > 0 && memos[0].updatedAt && (
+                      <div className="text-[11px] text-slate-400 mt-2">
+                        마지막 수정: {new Date(memos[0].updatedAt).toLocaleString()}
+                        {memos[0].version ? ` (v${memos[0].version})` : ""}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
               {/* 예약 확정 */}
-              <div className="p-4 md:px-8 md:py-3 border-t border-slate-200">
-                <section><h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-2">예약 확정</h4><Input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onBlur={e => onSchedule(lead.id, "appointmentAt", e.target.value)} className="text-xs md:text-sm" /></section>
-              </div>
+              {!readOnly && (
+                <div className="p-4 md:px-8 md:py-3 border-t border-slate-200">
+                  <section><h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-2">예약 확정</h4><Input type="datetime-local" defaultValue={toIsoLocal(lead.appointmentAt)} onBlur={e => onSchedule(lead.id, "appointmentAt", e.target.value)} className="text-xs md:text-sm" /></section>
+                </div>
+              )}
+              {readOnly && lead.appointmentAt && (
+                <div className="p-4 md:px-8 md:py-3 border-t border-slate-200">
+                  <h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-2">예약 확정</h4>
+                  <div className="text-sm text-slate-700">{new Date(lead.appointmentAt).toLocaleString()}</div>
+                </div>
+              )}
 
               {/* SMS Send Area */}
-              <div className="p-4 md:px-8 md:py-3 bg-white border-t border-slate-200">
+              {!readOnly && <div className="p-4 md:px-8 md:py-3 bg-white border-t border-slate-200">
                 <div className="relative">
                   <Textarea
                     value={smsMsg}
@@ -395,7 +428,7 @@ export function LeadDrawer({
                     />
                   </div>
                 )}
-              </div>
+              </div>}
 
               {/* Activity Timeline */}
               <ActivityTimeline activities={activities} loading={activitiesLoading} />
@@ -404,7 +437,7 @@ export function LeadDrawer({
         </div>
 
         {/* Footer Action Buttons */}
-        {lead && !loading && !error && (
+        {lead && !loading && !error && !readOnly && (
           <div className="p-3 md:p-4 bg-white border-t border-slate-200 shrink-0">
             <Button
               className="w-full"

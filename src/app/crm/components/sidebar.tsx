@@ -41,9 +41,17 @@ export function CrmSidebar() {
     ? session?.user?.name || "사용자"
     : process.env.NEXT_PUBLIC_USER_NAME || "상담원";
 
-  const filteredBottomItems = bottomItems.filter(
-    (item) => !item.roles || item.roles.includes(userRole)
-  );
+  const isHospitalStaff = userRole === "HOSPITAL_STAFF";
+
+  const filteredNavItems = isHospitalStaff
+    ? [{ icon: "calendar_month", path: "/crm/calendar", tooltip: "캘린더" }]
+    : navItems;
+
+  const filteredBottomItems = isHospitalStaff
+    ? []
+    : bottomItems.filter(
+        (item) => !item.roles || item.roles.includes(userRole)
+      );
 
   return (
     <aside className="hidden md:flex w-16 flex-col items-center py-6 bg-card border-r border-border shrink-0">
@@ -51,7 +59,7 @@ export function CrmSidebar() {
         D
       </div>
       <nav className="flex-1 flex flex-col gap-6 items-center w-full">
-        {navItems.map((item) => (
+        {filteredNavItems.map((item) => (
           <button
             key={item.icon}
             title={item.tooltip}
