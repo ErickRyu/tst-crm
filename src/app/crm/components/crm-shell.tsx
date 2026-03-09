@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { useLoading } from "../ui/loading-overlay";
-import type { ViewMode, Scope, CrmStatus, Lead, User, CalendarEvent, LeadMemo, SmsTemplate, ActivityItem } from "../types";
+import type { ViewMode, Scope, CrmStatus, Lead, User, LeadMemo, SmsTemplate } from "../types";
 import { statusOptions, kanbanStatusOptions, statusStyles } from "../types";
 import { KanbanView } from "./kanban-view";
 import { ListView } from "./list-view";
@@ -15,6 +15,8 @@ import { SkeletonOverlay } from "./skeleton-overlay";
 import { PrimaryBar } from "./primary-bar";
 import { FilterPanel } from "./filter-panel";
 import { CrmSidebar } from "./sidebar";
+import { useLeadDetail } from "../hooks/use-lead-detail";
+import { useCalendarData } from "../hooks/use-calendar-data";
 
 export function CrmShell() {
   const router = useRouter();
@@ -24,19 +26,9 @@ export function CrmShell() {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
-  const [detailLead, setDetailLead] = useState<Lead | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState<string | null>(null);
-  const [memos, setMemos] = useState<LeadMemo[]>([]);
-  const [memoInput, setMemoInput] = useState("");
-  const [memoLoading, setMemoLoading] = useState(false);
   const [memoSaving, setMemoSaving] = useState(false);
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
-  const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [smsTemplates, setSmsTemplates] = useState<SmsTemplate[]>([]);
   const [smsSending, setSmsSending] = useState(false);
   const [draggingId, setDraggingId] = useState<number | null>(null);
@@ -63,6 +55,18 @@ export function CrmShell() {
     ? (session?.user?.name || "상담원")
     : (process.env.NEXT_PUBLIC_USER_NAME || "상담원");
   const [pollTick, setPollTick] = useState(0);
+
+  const { calendarEvents, fetchCalendar } = useCalendarData({
+    assigneeId: selectedUserId,
+    pollingMs: 0,
+  });
+
+  const {
+    selectedLeadId, setSelectedLeadId,
+    detailLead, detailLoading, detailError,
+    memos, setMemos, memoInput, setMemoInput, memoLoading,
+    activities, activitiesLoading, fetchActivities,
+  } = useLeadDetail({ leads });
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -140,20 +144,6 @@ export function CrmShell() {
     }
   }, [scope, selectedUserId, sortOrder, dateFrom, dateTo, viewMode, currentPage, pageSize, debouncedSearch]);
 
-  const fetchCalendar = useCallback(async () => {
-    const qs = new URLSearchParams();
-    if (selectedUserId) qs.set("assigneeId", String(selectedUserId));
-    const res = await fetch(`/api/crm/calendar?${qs.toString()}`);
-    const json = await res.json();
-    if (res.ok) {
-      const newEvents = (json.data || []) as CalendarEvent[];
-      setCalendarEvents(prev => {
-        if (JSON.stringify(prev) === JSON.stringify(newEvents)) return prev;
-        return newEvents;
-      });
-    }
-  }, [selectedUserId]);
-
   const refreshAll = useCallback(async () => {
     const isInitial = !hasLoaded.current;
     const loadingId = isInitial ? startLoading("데이터를 불러오는 중") : null;
@@ -226,81 +216,6 @@ export function CrmShell() {
   useEffect(() => {
     void refreshAll();
   }, [pollTick, refreshAll]);
-
-  useEffect(() => {
-    const fetchDetail = async (id: number) => {
-      try {
-        setDetailLoading(true);
-        setDetailError(null);
-        const res = await fetch(`/api/leads/${id}`, {
-          headers: apiKey ? { "x-api-key": apiKey } : undefined,
-        });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.message || "상세 조회 실패");
-        const base = leads.find((l) => l.id === id);
-        setDetailLead({ ...(base || {} as Lead), ...(json.data || {}) });
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "상세 조회 실패";
-        setDetailError(msg);
-        toast.error(msg);
-      } finally {
-        setDetailLoading(false);
-      }
-    };
-    if (selectedLeadId) {
-      void fetchDetail(selectedLeadId);
-    } else {
-      setDetailLead(null);
-      setDetailError(null);
-    }
-  }, [selectedLeadId, leads, apiKey]);
-
-  useEffect(() => {
-    const fetchMemos = async (id: number) => {
-      try {
-        setMemoLoading(true);
-        const res = await fetch(`/api/crm/leads/${id}/memos`, {
-          headers: apiKey ? { "x-api-key": apiKey } : undefined,
-        });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.message || "메모 조회 실패");
-        const data = (json.data || []) as LeadMemo[];
-        setMemos(data);
-        setMemoInput(data[0]?.body || "치아상태 :\n거주지 :\n갯수:");
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "메모 조회 실패");
-      } finally {
-        setMemoLoading(false);
-      }
-    };
-    if (selectedLeadId) {
-      void fetchMemos(selectedLeadId);
-    } else {
-      setMemos([]);
-      setMemoInput("");
-    }
-  }, [selectedLeadId, apiKey]);
-
-  const fetchActivities = useCallback(async (id: number) => {
-    try {
-      setActivitiesLoading(true);
-      const res = await fetch(`/api/crm/leads/${id}/activities`);
-      const json = await res.json();
-      if (res.ok) setActivities((json.data || []) as ActivityItem[]);
-    } catch {
-      /* non-critical */
-    } finally {
-      setActivitiesLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (selectedLeadId) {
-      void fetchActivities(selectedLeadId);
-    } else {
-      setActivities([]);
-    }
-  }, [selectedLeadId, fetchActivities]);
 
   const updateStatus = async (id: number, status: CrmStatus) => {
     try {
