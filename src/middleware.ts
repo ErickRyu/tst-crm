@@ -7,9 +7,22 @@ import type { Role } from "@/lib/rbac";
 const PUBLIC_PATHS = ["/login", "/api/auth"];
 const AUTH_ENABLED = process.env.AUTH_ENABLED !== "false";
 
-function corsHeaders(): Record<string, string> {
+function corsHeaders(requestOrigin?: string | null): Record<string, string> {
+  let allowedOrigin = "*";
+  const envOrigins = process.env.ALLOWED_ORIGINS;
+  if (envOrigins && requestOrigin) {
+    const origins = envOrigins.split(",").map((o) => o.trim());
+    if (origins.includes(requestOrigin)) {
+      allowedOrigin = requestOrigin;
+    } else {
+      allowedOrigin = origins[0] || "*";
+    }
+  } else if (envOrigins && !requestOrigin) {
+    allowedOrigin = envOrigins.split(",")[0]?.trim() || "*";
+  }
+
   return {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, x-api-key",
     "Access-Control-Max-Age": "86400",
@@ -59,11 +72,11 @@ async function getSessionToken(request: NextRequest) {
 export async function middleware(request: NextRequest) {
   // Handle CORS preflight
   if (request.method === "OPTIONS") {
-    return new NextResponse(null, { status: 204, headers: corsHeaders() });
+    return new NextResponse(null, { status: 204, headers: corsHeaders(request.headers.get("origin")) });
   }
 
   const response = NextResponse.next();
-  for (const [key, value] of Object.entries(corsHeaders())) {
+  for (const [key, value] of Object.entries(corsHeaders(request.headers.get("origin")))) {
     response.headers.set(key, value);
   }
 
@@ -87,7 +100,7 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
         { code: 401, message: "인증이 필요합니다." },
-        { status: 401, headers: corsHeaders() }
+        { status: 401, headers: corsHeaders(request.headers.get("origin")) }
       );
     }
     // Page routes redirect to login

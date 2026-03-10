@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { requireAuth, hashPassword, verifyPassword } from "@/lib/auth-helpers";
+import { rateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const changePasswordSchema = z.object({
@@ -13,6 +14,14 @@ const changePasswordSchema = z.object({
 export async function POST(request: NextRequest) {
   const authResult = await requireAuth();
   if (authResult.error) return authResult.error;
+
+  const rl = rateLimit(`change-pw:${authResult.user.id}`, 5, 15 * 60 * 1000);
+  if (!rl.success) {
+    return NextResponse.json(
+      { code: 429, message: "너무 많은 요청입니다. 15분 후 다시 시도해주세요." },
+      { status: 429 }
+    );
+  }
 
   try {
     const body = await request.json();
