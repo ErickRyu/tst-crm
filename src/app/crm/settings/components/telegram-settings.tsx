@@ -54,7 +54,6 @@ export function TelegramSettings() {
   const [savingToken, setSavingToken] = useState(false);
   const [savingNotify, setSavingNotify] = useState(false);
   const [detecting, setDetecting] = useState(false);
-  const [editingToken, setEditingToken] = useState(false);
   const [detectedChats, setDetectedChats] = useState<DetectedChat[] | null>(null);
   const [selectedChats, setSelectedChats] = useState<Set<number>>(new Set());
   const [addingRecipients, setAddingRecipients] = useState(false);
@@ -110,7 +109,6 @@ export function TelegramSettings() {
       if (res.ok) {
         toast.success("Bot Token이 저장되었습니다.");
         setNewToken("");
-        setEditingToken(false);
         await fetchSettings();
       } else {
         toast.error("토큰 저장 실패");
@@ -349,12 +347,8 @@ export function TelegramSettings() {
     return <div className="text-sm text-slate-400 py-8 text-center">불러오는 중...</div>;
   }
 
-  const stepDone = (step: number) => {
-    if (step === 1) return hasToken;
-    if (step === 2) return hasToken;
-    if (step === 3) return hasRecipients;
-    return false;
-  };
+  // 추가 모드에서는 모든 스텝이 미완료 상태로 시작
+  const stepDone = (_step: number) => false;
 
   return (
     <div className="space-y-8">
@@ -498,7 +492,6 @@ export function TelegramSettings() {
                   setIsAddingMode(false);
                   setDetectedChats(null);
                   setSelectedChats(new Set());
-                  setEditingToken(false);
                   setNewToken("");
                 }}
               >
@@ -523,59 +516,33 @@ export function TelegramSettings() {
                 </div>
                 <div className="flex-1 pb-4">
                   <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Bot Token 입력</Label>
-                  {hasToken && !editingToken ? (
-                    <div className="flex items-center gap-2">
-                      <code className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-sm text-slate-600 font-mono">
-                        {settings.telegram_bot_token}
-                      </code>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEditingToken(true)}
-                      >
-                        변경
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <Input
-                        type="password"
-                        value={newToken}
-                        onChange={(e) => setNewToken(e.target.value)}
-                        placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
-                        className="max-w-md font-mono text-sm"
-                        onKeyDown={(e) => { if (e.key === "Enter") saveToken(); }}
-                      />
-                      <Button
-                        size="sm"
-                        onClick={saveToken}
-                        disabled={savingToken || !newToken.trim()}
-                      >
-                        {savingToken ? "저장 중..." : "토큰 저장"}
-                      </Button>
-                      {editingToken && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => { setEditingToken(false); setNewToken(""); }}
-                        >
-                          취소
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                  {!hasToken && (
-                    <p className="text-xs text-slate-400 mt-1.5">
-                      <a
-                        href="https://core.telegram.org/bots#how-do-i-create-a-bot"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary underline"
-                      >
-                        봇 생성 방법 안내
-                      </a>
-                    </p>
-                  )}
+                  <div className="flex gap-2">
+                    <Input
+                      type="password"
+                      value={newToken}
+                      onChange={(e) => setNewToken(e.target.value)}
+                      placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
+                      className="max-w-md font-mono text-sm"
+                      onKeyDown={(e) => { if (e.key === "Enter") saveToken(); }}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={saveToken}
+                      disabled={savingToken || !newToken.trim()}
+                    >
+                      {savingToken ? "저장 중..." : "토큰 저장"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1.5">
+                    <a
+                      href="https://core.telegram.org/bots#how-do-i-create-a-bot"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline"
+                    >
+                      봇 생성 방법 안내
+                    </a>
+                  </p>
                 </div>
               </div>
 
