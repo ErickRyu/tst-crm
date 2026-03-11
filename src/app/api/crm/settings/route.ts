@@ -5,15 +5,22 @@ import { eq } from "drizzle-orm";
 import { crmSettingsUpdateSchema } from "@/lib/validation";
 import { requireAuth } from "@/lib/auth-helpers";
 
+// 공개 키: 모든 인증된 사용자가 조회 가능
+const PUBLIC_SETTING_KEYS = ["clinic_name"];
+
 export async function GET() {
-  const authResult = await requireAuth(["ADMIN"]);
+  const authResult = await requireAuth();
   if (authResult.error) return authResult.error;
+
+  const isAdmin = authResult.user.role === "ADMIN";
 
   try {
     const rows = await db.select().from(crmSettings);
     const settings: Record<string, string> = {};
     for (const row of rows) {
-      settings[row.key] = row.value;
+      if (isAdmin || PUBLIC_SETTING_KEYS.includes(row.key)) {
+        settings[row.key] = row.value;
+      }
     }
     return NextResponse.json({ code: 200, message: "설정 조회 성공", data: settings });
   } catch {
