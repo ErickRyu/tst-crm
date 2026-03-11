@@ -73,6 +73,16 @@ export function useLeadDetail(options: UseLeadDetailOptions = {}): UseLeadDetail
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId, apiKey]);
 
+  // leads 변경 시 detailLead 동기화
+  useEffect(() => {
+    if (!selectedLeadId || !detailLead) return;
+    const updated = leads.find((l) => l.id === selectedLeadId);
+    if (updated) {
+      setDetailLead((prev) => prev ? { ...prev, ...updated } : prev);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leads, selectedLeadId]);
+
   // Fetch memos
   useEffect(() => {
     if (!selectedLeadId) {
