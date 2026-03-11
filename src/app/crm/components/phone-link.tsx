@@ -7,6 +7,7 @@ export function downloadVCard(name: string, phone: string, clinicName?: string) 
     "BEGIN:VCARD",
     "VERSION:3.0",
     `FN:${name}`,
+    `N:${name};;;;`,
     `TEL;TYPE=CELL:${phone}`,
   ];
   if (clinicName) lines.push(`ORG:${clinicName}`);

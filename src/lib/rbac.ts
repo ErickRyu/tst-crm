@@ -23,7 +23,9 @@ export function canAccessPage(pathname: string, role: Role): boolean {
     return PAGE_ROLES[pathname].includes(role);
   }
   // Check prefix matches (e.g., /crm/settings/xxx matches /crm/settings)
-  for (const [path, roles] of Object.entries(PAGE_ROLES)) {
+  // Sort by path length descending to match longest prefix first
+  const sortedEntries = Object.entries(PAGE_ROLES).sort((a, b) => b[0].length - a[0].length);
+  for (const [path, roles] of sortedEntries) {
     if (pathname.startsWith(path + "/")) {
       return roles.includes(role);
     }

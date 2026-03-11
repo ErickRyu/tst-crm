@@ -51,7 +51,16 @@ export async function PATCH(request: NextRequest) {
       .update(users)
       .set(updates)
       .where(eq(users.id, authResult.user.id))
-      .returning();
+      .returning({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        phone: users.phone,
+        role: users.role,
+        status: users.status,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+      });
 
     return NextResponse.json({ code: 200, message: "프로필이 수정되었습니다.", data: updated });
   } catch {

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 import { eq, and, ne, sql } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth-helpers";
+import { adminUserUpdateSchema } from "@/lib/validation";
 
 type Params = { params: Promise<{ userId: string }> };
 
@@ -18,20 +19,28 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   try {
     const body = await request.json();
+    const parsed = adminUserUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { code: 400, message: parsed.error.issues[0]?.message || "유효하지 않은 데이터입니다." },
+        { status: 400 }
+      );
+    }
+
     const updates: Record<string, unknown> = {};
 
-    if (body.name !== undefined) updates.name = body.name;
-    if (body.phone !== undefined) updates.phone = body.phone;
-    if (body.email !== undefined) updates.email = body.email;
-    if (body.role !== undefined) updates.role = body.role;
-    if (body.isActive !== undefined) updates.isActive = body.isActive;
-    if (body.status !== undefined) updates.status = body.status;
+    if (parsed.data.name !== undefined) updates.name = parsed.data.name;
+    if (parsed.data.phone !== undefined) updates.phone = parsed.data.phone;
+    if (parsed.data.email !== undefined) updates.email = parsed.data.email;
+    if (parsed.data.role !== undefined) updates.role = parsed.data.role;
+    if (parsed.data.isActive !== undefined) updates.isActive = parsed.data.isActive;
+    if (parsed.data.status !== undefined) updates.status = parsed.data.status;
 
     // Sync isActive and status
-    if (body.status === "INACTIVE" && body.isActive === undefined) {
+    if (parsed.data.status === "INACTIVE" && parsed.data.isActive === undefined) {
       updates.isActive = 0;
     }
-    if (body.status === "ACTIVE" && body.isActive === undefined) {
+    if (parsed.data.status === "ACTIVE" && parsed.data.isActive === undefined) {
       updates.isActive = 1;
     }
 
@@ -40,7 +49,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     // Prevent deactivating last admin
-    if (body.status === "INACTIVE" || body.role !== undefined) {
+    if (parsed.data.status === "INACTIVE" || parsed.data.role !== undefined) {
       const [target] = await db
         .select({ role: users.role })
         .from(users)
@@ -54,7 +63,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           .where(and(eq(users.role, "ADMIN"), eq(users.status, "ACTIVE"), ne(users.id, id)));
 
         if (Number(adminCount.count) === 0) {
-          if (body.status === "INACTIVE" || (body.role && body.role !== "ADMIN")) {
+          if (parsed.data.status === "INACTIVE" || (parsed.data.role && parsed.data.role !== "ADMIN")) {
             return NextResponse.json(
               { code: 400, message: "마지막 관리자는 비활성화하거나 역할을 변경할 수 없습니다." },
               { status: 400 }
@@ -70,7 +79,18 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       .update(users)
       .set(updates)
       .where(eq(users.id, id))
-      .returning();
+      .returning({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        phone: users.phone,
+        role: users.role,
+        status: users.status,
+        isActive: users.isActive,
+        lastLoginAt: users.lastLoginAt,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+      });
 
     if (!updated) {
       return NextResponse.json({ code: 404, message: "상담원을 찾을 수 없습니다." }, { status: 404 });

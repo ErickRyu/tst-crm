@@ -52,11 +52,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: "/login",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.userId = Number(user.id);
         token.role = (user as unknown as Record<string, unknown>).role as string;
         token.forcePasswordChange = (user as unknown as Record<string, unknown>).forcePasswordChange as boolean;
+      }
+      // On session update (triggered after password change), refresh from DB
+      if (trigger === "update" && token.userId) {
+        const [dbUser] = await db
+          .select({ forcePasswordChange: users.forcePasswordChange, role: users.role })
+          .from(users)
+          .where(eq(users.id, Number(token.userId)))
+          .limit(1);
+        if (dbUser) {
+          token.forcePasswordChange = dbUser.forcePasswordChange === 1;
+          token.role = dbUser.role;
+        }
       }
       return token;
     },

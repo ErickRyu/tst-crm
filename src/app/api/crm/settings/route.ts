@@ -6,7 +6,7 @@ import { crmSettingsUpdateSchema } from "@/lib/validation";
 import { requireAuth } from "@/lib/auth-helpers";
 
 export async function GET() {
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(["ADMIN"]);
   if (authResult.error) return authResult.error;
 
   try {

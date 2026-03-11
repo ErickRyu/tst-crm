@@ -6,11 +6,14 @@ import { requireAuth, hashPassword } from "@/lib/auth-helpers";
 import { z } from "zod";
 
 export async function GET(request: NextRequest) {
-  const authResult = await requireAuth();
-  if (authResult.error) return authResult.error;
-
   const { searchParams } = new URL(request.url);
   const includeAll = searchParams.get("includeAll") === "true";
+
+  // includeAll requires ADMIN role
+  const authResult = includeAll
+    ? await requireAuth(["ADMIN"])
+    : await requireAuth();
+  if (authResult.error) return authResult.error;
 
   const rows = includeAll
     ? await db
@@ -77,7 +80,15 @@ export async function POST(request: NextRequest) {
     const [created] = await db
       .insert(users)
       .values(values)
-      .returning();
+      .returning({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        phone: users.phone,
+        role: users.role,
+        status: users.status,
+        createdAt: users.createdAt,
+      });
 
     return NextResponse.json(
       { code: 201, message: "사용자가 생성되었습니다.", data: created },

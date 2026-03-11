@@ -156,3 +156,13 @@ export const crmUserUpdateSchema = z.object({
   phone: z.string().nullable().optional(),
   isActive: z.number().int().min(0).max(1).optional(),
 });
+
+// --- Admin user update ---
+export const adminUserUpdateSchema = z.object({
+  name: z.string().min(1).max(50).optional(),
+  phone: z.string().max(20).nullable().optional(),
+  email: z.string().email("유효한 이메일을 입력하세요.").optional(),
+  role: z.enum(["ADMIN", "COUNSELOR", "HOSPITAL_STAFF"]).optional(),
+  status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
+  isActive: z.number().int().min(0).max(1).optional(),
+});
