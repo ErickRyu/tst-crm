@@ -137,7 +137,7 @@ export async function getRemaining(): Promise<SmsRemainingResult> {
 }
 
 // ---------- New APIs ----------
-export async function getSmsHistory(params?: SmsHistoryRequest): Promise<SmsHistoryResult> {
+export async function getSmsHistory(params: SmsHistoryRequest = {}): Promise<SmsHistoryResult> {
   return provider.getHistory(params);
 }
 
