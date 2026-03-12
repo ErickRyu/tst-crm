@@ -465,7 +465,7 @@ export function CrmShell() {
             </div>
           )}
           {(hasLoaded.current || !loading) && viewMode === "list" && <ListView leads={filteredLeads} users={users} onSelect={setSelectedLeadId} selectedId={selectedLeadId} onStatus={updateStatus} onAssignee={updateAssignee} onSchedule={updateSchedule} loading={loading} pagination={{ currentPage, pageSize, totalCount, totalPages, onPageChange: setCurrentPage, onPageSizeChange: setPageSize }} />}
-          {(hasLoaded.current || !loading) && viewMode === "calendar" && <CalendarView events={calendarEvents} />}
+          {(hasLoaded.current || !loading) && viewMode === "calendar" && <CalendarView events={calendarEvents} onSelect={setSelectedLeadId} />}
         </div>
       </main>
 
