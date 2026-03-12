@@ -141,3 +141,24 @@ export const telegramRecipients = pgTable("telegram_recipients", {
   isEnabled: integer("is_enabled").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const userTelegramSettings = pgTable("user_telegram_settings", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id).unique(),
+  botToken: text("bot_token"),
+  enabled: integer("enabled").default(0).notNull(),
+  notifyNewLead: integer("notify_new_lead").default(1).notNull(),
+  notifyStatusChange: integer("notify_status_change").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const userTelegramRecipients = pgTable("user_telegram_recipients", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  chatId: text("chat_id").notNull(),
+  label: text("label").notNull(),
+  chatType: text("chat_type"),
+  isEnabled: integer("is_enabled").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

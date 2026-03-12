@@ -1,10 +1,11 @@
 import { db } from "@/lib/db";
-import { crmSettings, telegramRecipients } from "@/lib/schema";
-import { eq, InferSelectModel } from "drizzle-orm";
+import { crmSettings, telegramRecipients, userTelegramSettings, userTelegramRecipients } from "@/lib/schema";
+import { eq, inArray, InferSelectModel } from "drizzle-orm";
 import { decrypt } from "@/lib/crypto";
 import * as Sentry from "@sentry/nextjs";
 
 type TelegramRecipientRow = InferSelectModel<typeof telegramRecipients>;
+type UserTelegramRecipientRow = InferSelectModel<typeof userTelegramRecipients>;
 
 interface TelegramRecipient {
   id: number;
@@ -177,6 +178,75 @@ async function sendToAllRecipients(
   });
 }
 
+interface UserTelegramConfig {
+  userId: number;
+  botToken: string;
+  notifyNewLead: boolean;
+  notifyStatusChange: boolean;
+  recipients: TelegramRecipient[];
+}
+
+async function getEnabledUserTelegramConfigs(): Promise<UserTelegramConfig[]> {
+  try {
+    // 1) enabled 사용자 설정 조회 (1 query)
+    const settingsRows = await db
+      .select()
+      .from(userTelegramSettings)
+      .where(eq(userTelegramSettings.enabled, 1));
+
+    if (settingsRows.length === 0) return [];
+
+    // botToken 복호화 + 유효한 설정만 필터
+    const validSettings: Array<{ row: typeof settingsRows[number]; botToken: string }> = [];
+    for (const row of settingsRows) {
+      if (!row.botToken) continue;
+      try {
+        validSettings.push({ row, botToken: decrypt(row.botToken) });
+      } catch {
+        continue;
+      }
+    }
+
+    if (validSettings.length === 0) return [];
+
+    // 2) 해당 사용자들의 수신자 한번에 조회 (1 query, N+1 해소)
+    const userIds = validSettings.map((s) => s.row.userId);
+    const allRecipientRows = await db
+      .select()
+      .from(userTelegramRecipients)
+      .where(inArray(userTelegramRecipients.userId, userIds));
+
+    // userId 기준으로 그룹핑
+    const recipientsByUser = new Map<number, TelegramRecipient[]>();
+    for (const r of allRecipientRows) {
+      const list = recipientsByUser.get(r.userId) ?? [];
+      list.push({ id: r.id, chatId: r.chatId, label: r.label, chatType: r.chatType, isEnabled: r.isEnabled });
+      recipientsByUser.set(r.userId, list);
+    }
+
+    // 3) config 조립
+    const configs: UserTelegramConfig[] = [];
+    for (const { row, botToken } of validSettings) {
+      const recipients = recipientsByUser.get(row.userId);
+      if (!recipients || recipients.length === 0) continue;
+
+      configs.push({
+        userId: row.userId,
+        botToken,
+        notifyNewLead: row.notifyNewLead === 1,
+        notifyStatusChange: row.notifyStatusChange === 1,
+        recipients,
+      });
+    }
+
+    return configs;
+  } catch (err) {
+    console.error("[Telegram] getEnabledUserTelegramConfigs error:", err);
+    Sentry.captureException(err, { tags: { function: "getEnabledUserTelegramConfigs" } });
+    return [];
+  }
+}
+
 interface NewLeadData {
   id: number;
   name: string;
@@ -187,17 +257,6 @@ interface NewLeadData {
 }
 
 export async function notifyNewLead(lead: NewLeadData): Promise<void> {
-  const settings = await getTelegramSettings();
-
-  if (!settings.enabled || !settings.notifyNewLead) {
-    console.log("[Telegram] notifyNewLead skipped — enabled:", settings.enabled, "notifyNewLead:", settings.notifyNewLead);
-    return;
-  }
-  if (!settings.botToken || settings.recipients.length === 0) {
-    console.log("[Telegram] notifyNewLead skipped — missing botToken or no recipients");
-    return;
-  }
-
   const text = [
     "🆕 <b>새 리드 인입</b>",
     "",
@@ -208,7 +267,17 @@ export async function notifyNewLead(lead: NewLeadData): Promise<void> {
     `🕐 시간: ${formatTime(lead.createdAt)}`,
   ].join("\n");
 
-  await sendToAllRecipients(settings.botToken, settings.recipients, text, "notifyNewLead");
+  const userConfigs = await getEnabledUserTelegramConfigs();
+  if (userConfigs.length === 0) {
+    console.log("[Telegram] notifyNewLead skipped — no enabled user configs");
+    return;
+  }
+
+  await Promise.allSettled(
+    userConfigs
+      .filter((c) => c.notifyNewLead)
+      .map((c) => sendToAllRecipients(c.botToken, c.recipients, text, `notifyNewLead(user:${c.userId})`))
+  );
 }
 
 interface StatusChangeData {
@@ -220,17 +289,6 @@ interface StatusChangeData {
 }
 
 export async function notifyStatusChange(data: StatusChangeData): Promise<void> {
-  const settings = await getTelegramSettings();
-
-  if (!settings.enabled || !settings.notifyStatusChange) {
-    console.log("[Telegram] notifyStatusChange skipped — enabled:", settings.enabled, "notifyStatusChange:", settings.notifyStatusChange);
-    return;
-  }
-  if (!settings.botToken || settings.recipients.length === 0) {
-    console.log("[Telegram] notifyStatusChange skipped — missing botToken or no recipients");
-    return;
-  }
-
   const text = [
     "🔄 <b>상태 변경</b>",
     "",
@@ -239,7 +297,17 @@ export async function notifyStatusChange(data: StatusChangeData): Promise<void> 
     `🙋 담당: ${data.actorName}`,
   ].join("\n");
 
-  await sendToAllRecipients(settings.botToken, settings.recipients, text, "notifyStatusChange");
+  const userConfigs = await getEnabledUserTelegramConfigs();
+  if (userConfigs.length === 0) {
+    console.log("[Telegram] notifyStatusChange skipped — no enabled user configs");
+    return;
+  }
+
+  await Promise.allSettled(
+    userConfigs
+      .filter((c) => c.notifyStatusChange)
+      .map((c) => sendToAllRecipients(c.botToken, c.recipients, text, `notifyStatusChange(user:${c.userId})`))
+  );
 }
 
 export async function testTelegramConnection(

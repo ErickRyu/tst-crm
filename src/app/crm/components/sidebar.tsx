@@ -20,7 +20,7 @@ const bottomItems: NavItem[] = [
   { icon: "campaign", path: "/crm/updates", tooltip: "업데이트" },
   { icon: "admin_panel_settings", path: "/crm/users", roles: ["ADMIN"], tooltip: "사용자 관리" },
   { icon: "history", path: "/crm/audit-logs", roles: ["ADMIN"], tooltip: "감사 로그" },
-  { icon: "settings", path: "/crm/settings", roles: ["ADMIN"], tooltip: "설정" },
+  { icon: "settings", path: "/crm/settings", roles: ["ADMIN", "COUNSELOR"], tooltip: "설정" },
 ];
 
 function isActive(currentPath: string, itemPath: string) {

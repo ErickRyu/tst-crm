@@ -1,15 +1,42 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { CrmSidebar } from "../../components/sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TemplateList } from "./template-list";
 import { AutoSendRules } from "./auto-send-rules";
 import { GlobalSettings } from "./global-settings";
-import { TelegramSettings } from "./telegram-settings";
+import { MyTelegramSettings } from "./my-telegram-settings";
+import { MyProfile } from "./my-profile";
+
+interface TabDef {
+  value: string;
+  label: string;
+  icon: string;
+  roles: string[];
+  component: React.ReactNode;
+}
+
+const ALL_TABS: TabDef[] = [
+  { value: "templates", label: "템플릿 관리", icon: "sms", roles: ["ADMIN"], component: <TemplateList /> },
+  { value: "auto-send", label: "자동발송 규칙", icon: "bolt", roles: ["ADMIN"], component: <AutoSendRules /> },
+  { value: "general", label: "기본 설정", icon: "settings", roles: ["ADMIN"], component: <GlobalSettings /> },
+  { value: "my-telegram", label: "텔레그램 알림", icon: "send", roles: ["ADMIN", "COUNSELOR"], component: <MyTelegramSettings /> },
+  { value: "my-profile", label: "내 정보", icon: "person", roles: ["ADMIN", "COUNSELOR"], component: <MyProfile /> },
+];
 
 export function SettingsShell() {
   const router = useRouter();
+  const { data: session } = useSession();
+
+  const authEnabled = process.env.NEXT_PUBLIC_AUTH_ENABLED !== "false";
+  const userRole = authEnabled
+    ? ((session?.user as Record<string, unknown>)?.role as string) || "COUNSELOR"
+    : "ADMIN";
+
+  const visibleTabs = ALL_TABS.filter((tab) => tab.roles.includes(userRole));
+  const defaultTab = userRole === "ADMIN" ? "templates" : "my-telegram";
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden text-slate-900 font-[family-name:var(--font-sans)]">
@@ -27,38 +54,21 @@ export function SettingsShell() {
 
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-4xl mx-auto px-4 md:px-8 py-6">
-        <Tabs defaultValue="templates">
+        <Tabs defaultValue={defaultTab}>
           <TabsList className="mb-6">
-            <TabsTrigger value="templates">
-              <span className="material-icons text-sm mr-1">sms</span>
-              템플릿 관리
-            </TabsTrigger>
-            <TabsTrigger value="auto-send">
-              <span className="material-icons text-sm mr-1">bolt</span>
-              자동발송 규칙
-            </TabsTrigger>
-            <TabsTrigger value="general">
-              <span className="material-icons text-sm mr-1">settings</span>
-              기본 설정
-            </TabsTrigger>
-            <TabsTrigger value="telegram">
-              <span className="material-icons text-sm mr-1">send</span>
-              텔레그램 알림
-            </TabsTrigger>
+            {visibleTabs.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value}>
+                <span className="material-icons text-sm mr-1">{tab.icon}</span>
+                {tab.label}
+              </TabsTrigger>
+            ))}
           </TabsList>
 
-          <TabsContent value="templates">
-            <TemplateList />
-          </TabsContent>
-          <TabsContent value="auto-send">
-            <AutoSendRules />
-          </TabsContent>
-          <TabsContent value="general">
-            <GlobalSettings />
-          </TabsContent>
-          <TabsContent value="telegram">
-            <TelegramSettings />
-          </TabsContent>
+          {visibleTabs.map((tab) => (
+            <TabsContent key={tab.value} value={tab.value}>
+              {tab.component}
+            </TabsContent>
+          ))}
         </Tabs>
           </div>
         </div>

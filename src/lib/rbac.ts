@@ -12,7 +12,7 @@ export const ROLE_LABELS: Record<Role, string> = {
 const PAGE_ROLES: Record<string, Role[]> = {
   "/crm/users": ["ADMIN"],
   "/crm/audit-logs": ["ADMIN"],
-  "/crm/settings": ["ADMIN"],
+  "/crm/settings": ["ADMIN", "COUNSELOR"],
   "/crm/calendar": ["ADMIN", "COUNSELOR", "HOSPITAL_STAFF"],
   "/crm": ["ADMIN", "COUNSELOR"],
 };
