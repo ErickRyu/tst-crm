@@ -32,17 +32,11 @@ export async function POST(request: NextRequest) {
     type LeadInfo = { id: number; name: string; phone: string };
     const leadMap = new Map<number, LeadInfo>(targetLeads.map((l: LeadInfo) => [l.id, l]));
 
-    const results: { leadId: number; status: string; error?: string }[] = [];
-    let success = 0;
-    let failed = 0;
-
-    // Send SMS sequentially to avoid rate limiting
-    for (const leadId of leadIds) {
+    // Process a single lead SMS
+    const processOne = async (leadId: number): Promise<{ leadId: number; status: string; error?: string }> => {
       const lead = leadMap.get(leadId);
       if (!lead) {
-        results.push({ leadId, status: "not_found", error: "리드를 찾을 수 없습니다." });
-        failed++;
-        continue;
+        return { leadId, status: "not_found", error: "리드를 찾을 수 없습니다." };
       }
 
       try {
@@ -70,17 +64,26 @@ export async function POST(request: NextRequest) {
         });
 
         if (isSuccess || isTestMode) {
-          results.push({ leadId, status: "success" });
-          success++;
+          return { leadId, status: "success" };
         } else {
-          results.push({ leadId, status: "failed", error: result.message });
-          failed++;
+          return { leadId, status: "failed", error: result.message };
         }
       } catch (e) {
-        results.push({ leadId, status: "failed", error: e instanceof Error ? e.message : "발송 오류" });
-        failed++;
+        return { leadId, status: "failed", error: e instanceof Error ? e.message : "발송 오류" };
       }
+    };
+
+    // Send SMS in parallel with concurrency limit of 5
+    const CONCURRENCY = 5;
+    const results: { leadId: number; status: string; error?: string }[] = [];
+    for (let i = 0; i < leadIds.length; i += CONCURRENCY) {
+      const batch = leadIds.slice(i, i + CONCURRENCY);
+      const batchResults = await Promise.all(batch.map(processOne));
+      results.push(...batchResults);
     }
+
+    const success = results.filter(r => r.status === "success").length;
+    const failed = results.filter(r => r.status !== "success").length;
 
     return NextResponse.json({
       code: 200,
