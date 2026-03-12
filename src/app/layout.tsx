@@ -29,6 +29,7 @@ export default function RootLayout({
       </head>
       <body
         className="antialiased font-[family-name:var(--font-sans)]"
+        suppressHydrationWarning
       >
         <Providers>
           {children}

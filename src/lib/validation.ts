@@ -147,6 +147,27 @@ export const autoSendRuleUpdateSchema = z.object({
   isEnabled: z.boolean().optional(),
 });
 
+// --- Bulk operation schemas ---
+export const bulkStatusUpdateSchema = z.object({
+  leadIds: z.array(z.number().int().positive()).min(1).max(100),
+  crmStatus: crmStatusSchema,
+  actorName: z.string().max(50).optional(),
+});
+
+export const bulkAssignSchema = z.object({
+  leadIds: z.array(z.number().int().positive()).min(1).max(100),
+  assigneeId: z.number().int().positive().nullable(),
+  actorName: z.string().max(50).optional(),
+});
+
+export const bulkSmsSchema = z.object({
+  leadIds: z.array(z.number().int().positive()).min(1).max(50),
+  msg: z.string().min(1, "메시지 내용은 필수입니다.").max(2000),
+  templateKey: z.string().optional(),
+  msgType: z.enum(["SMS", "LMS"]).optional(),
+  senderName: z.string().min(1).max(50),
+});
+
 // --- CRM Settings schemas ---
 export const crmSettingsUpdateSchema = z.record(z.string(), z.string());
 

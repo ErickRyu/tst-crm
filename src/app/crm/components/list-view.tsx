@@ -14,9 +14,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 
-export function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, onSchedule, loading, pagination }: ViewProps) {
+export function ListView({ leads, users, onSelect, selectedId, onStatus, onAssignee, onSchedule, loading, pagination, bulk }: ViewProps) {
   const stop = (e: React.MouseEvent | React.ChangeEvent) => e.stopPropagation();
+  const allSelected = bulk && leads.length > 0 && leads.every(l => bulk.selectedLeadIds.has(l.id));
   const p = pagination;
   const rowNum = (idx: number) => p ? p.currentPage * p.pageSize + idx + 1 : idx + 1;
 
@@ -41,9 +43,15 @@ export function ListView({ leads, users, onSelect, selectedId, onStatus, onAssig
         {!loading && leads.length === 0 && <div className="py-20 text-center text-slate-400">조회된 데이터가 없습니다.</div>}
         {!loading && <div className="divide-y divide-slate-100">
           {leads.map((l, idx) => (
-            <div key={l.id} onClick={() => onSelect(l.id)} className={`p-3 cursor-pointer transition-colors ${selectedId === l.id ? "bg-blue-50/50" : ""}`}>
+            <div key={l.id} onClick={() => onSelect(l.id)} className={`p-3 cursor-pointer transition-colors ${bulk?.selectedLeadIds.has(l.id) ? "bg-primary/5" : selectedId === l.id ? "bg-blue-50/50" : ""}`}>
               <div className="flex justify-between items-start mb-2">
-                <div className="flex items-start gap-2"><span className="text-[11px] font-semibold text-slate-400 mt-0.5 min-w-[1.2rem]">{rowNum(idx)}</span><div><div className="font-bold text-sm text-slate-900">{l.name}</div><PhoneLink phone={l.phone} className="text-xs text-slate-500" /></div></div>
+                <div className="flex items-start gap-2">
+                  {bulk && (
+                    <div className="mt-0.5 shrink-0" onClick={stop}>
+                      <Checkbox checked={bulk.selectedLeadIds.has(l.id)} onCheckedChange={() => bulk.onToggleSelect(l.id)} />
+                    </div>
+                  )}
+                  <span className="text-[11px] font-semibold text-slate-400 mt-0.5 min-w-[1.2rem]">{rowNum(idx)}</span><div><div className="font-bold text-sm text-slate-900">{l.name}</div><PhoneLink phone={l.phone} className="text-xs text-slate-500" /></div></div>
                 <div className="text-[10px] text-slate-400 whitespace-nowrap">유입 {fmtCreatedAt(l.createdAt)}</div>
               </div>
               <div className="flex flex-wrap gap-1 mb-2">
@@ -71,6 +79,17 @@ export function ListView({ leads, users, onSelect, selectedId, onStatus, onAssig
         <Table>
           <TableHeader className="sticky top-0 bg-slate-50 z-10">
             <TableRow>
+              {bulk && (
+                <TableHead className="w-10 text-center">
+                  <Checkbox
+                    checked={allSelected ?? false}
+                    onCheckedChange={() => {
+                      if (allSelected) bulk.onDeselectAll();
+                      else bulk.onSelectAll(leads.map(l => l.id));
+                    }}
+                  />
+                </TableHead>
+              )}
               <TableHead className="w-10 text-center uppercase text-[10px]">No.</TableHead>
               <TableHead className="uppercase text-[10px]">환자 정보</TableHead>
               <TableHead className="uppercase text-[10px]">유입일</TableHead>
@@ -82,7 +101,12 @@ export function ListView({ leads, users, onSelect, selectedId, onStatus, onAssig
           </TableHeader>
           <TableBody>
             {leads.map((l, idx) => (
-              <TableRow key={l.id} onClick={() => onSelect(l.id)} className={`cursor-pointer ${selectedId === l.id ? "bg-blue-50/50" : ""}`}>
+              <TableRow key={l.id} onClick={() => onSelect(l.id)} className={`cursor-pointer ${bulk?.selectedLeadIds.has(l.id) ? "bg-primary/5" : selectedId === l.id ? "bg-blue-50/50" : ""}`}>
+                {bulk && (
+                  <TableCell className="text-center" onClick={stop}>
+                    <Checkbox checked={bulk.selectedLeadIds.has(l.id)} onCheckedChange={() => bulk.onToggleSelect(l.id)} />
+                  </TableCell>
+                )}
                 <TableCell className="text-center text-xs text-slate-400 font-semibold">{rowNum(idx)}</TableCell>
                 <TableCell><div className="flex items-center gap-2"><div><div className="font-bold text-slate-900">{l.name}</div><PhoneLink phone={l.phone} className="text-[10px] text-slate-500" /></div></div></TableCell>
                 <TableCell className="text-xs text-slate-500">{fmtCreatedAt(l.createdAt)}</TableCell>
@@ -111,7 +135,7 @@ export function ListView({ leads, users, onSelect, selectedId, onStatus, onAssig
               </TableRow>
             ))}
             {leads.length === 0 && !loading && (
-              <TableRow><TableCell colSpan={7} className="py-20 text-center text-slate-400">조회된 데이터가 없습니다.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={bulk ? 8 : 7} className="py-20 text-center text-slate-400">조회된 데이터가 없습니다.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
