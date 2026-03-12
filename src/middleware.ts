@@ -92,6 +92,14 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
+  // API key authentication for API routes
+  if (pathname.startsWith("/api/")) {
+    const apiKey = request.headers.get("x-api-key");
+    if (apiKey && process.env.API_KEY && apiKey === process.env.API_KEY) {
+      return response;
+    }
+  }
+
   // Decrypt JWT token (Edge-compatible, using jose + hkdf)
   const token = await getSessionToken(request);
 
