@@ -62,7 +62,8 @@
       "Bash(npm view:*)",
       "Bash(NEXT_DISABLE_TURBOPACK=1 npx next:*)",
       "Bash(lsof:*)",
-      "Bash(kill 66699:*)"
+      "Bash(kill 66699:*)",
+      "Bash(vercel:*)"
     ]
   }
 }

@@ -230,7 +230,7 @@ export function LeadDrawer({
         </div>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto flex flex-col">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain flex flex-col" style={{ touchAction: "pan-y" }}>
           {loading && (
             <div className="flex flex-col items-center justify-center flex-1 text-slate-400 gap-2">
               <span className="material-icons animate-spin">refresh</span>
