@@ -6,11 +6,13 @@ import { statusStyles, fmtCreatedAt } from "../types";
 import { PhoneLink } from "./phone-link";
 import { TagChip } from "./tag-chip";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 
-export const KanbanCard = memo(function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMemo, setDraggingId }: {
+export const KanbanCard = memo(function KanbanCard({ lead: l, users, selectedId, draggingId, onSelect, onSaveMemo, setDraggingId, onToggleSelect, isSelected }: {
   lead: Lead; users: User[]; selectedId: number | null; draggingId: number | null;
   onSelect: (id: number) => void; onSaveMemo: (leadId: number, body: string) => Promise<void>;
   setDraggingId: (id: number | null) => void;
+  onToggleSelect?: (id: number) => void; isSelected?: boolean;
 }) {
   const [memoOpen, setMemoOpen] = useState(false);
   const [memoText, setMemoText] = useState("");
@@ -35,10 +37,16 @@ export const KanbanCard = memo(function KanbanCard({ lead: l, users, selectedId,
 
   return (
     <div draggable onDragStart={() => setDraggingId(l.id)} onDragEnd={() => setDraggingId(null)} onClick={() => onSelect(l.id)}
-      className={`p-3 md:p-4 rounded-xl shadow-sm border bg-white cursor-grab transition-all hover:shadow-md ${statusStyles[l.crmStatus].border} ${selectedId === l.id ? "ring-2 ring-primary" : ""} ${draggingId === l.id ? "opacity-40" : ""}`}
+      className={`group/card p-3 md:p-4 rounded-xl shadow-sm border bg-white cursor-grab transition-all hover:shadow-md ${statusStyles[l.crmStatus].border} ${isSelected ? "ring-2 ring-primary bg-primary/5" : selectedId === l.id ? "ring-2 ring-primary" : ""} ${draggingId === l.id ? "opacity-40" : ""}`}
     >
       <div className="flex justify-between items-start mb-2">
-        <div><div className="font-bold text-sm">{l.name}</div><PhoneLink phone={l.phone} className="text-xs md:text-[10px] text-slate-500" /></div>
+        {/* Checkbox: always visible on mobile, hover-visible on desktop */}
+        {onToggleSelect && (
+          <div className="mr-2 shrink-0 md:opacity-0 md:group-hover/card:opacity-100 transition-opacity" onClick={e => e.stopPropagation()} style={isSelected ? { opacity: 1 } : undefined}>
+            <Checkbox checked={isSelected ?? false} onCheckedChange={() => onToggleSelect(l.id)} />
+          </div>
+        )}
+        <div className="flex-1 min-w-0"><div className="font-bold text-sm">{l.name}</div><PhoneLink phone={l.phone} className="text-xs md:text-[10px] text-slate-500" /></div>
         <div className="text-[10px] text-slate-400 whitespace-nowrap">{fmtCreatedAt(l.createdAt)}</div>
       </div>
       <div className="flex flex-wrap gap-1 mb-2 md:mb-3">
@@ -94,5 +102,6 @@ export const KanbanCard = memo(function KanbanCard({ lead: l, users, selectedId,
     && prev.lead.media === next.lead.media
     && prev.lead.careTag === next.lead.careTag
     && prev.selectedId === next.selectedId
-    && prev.draggingId === next.draggingId;
+    && prev.draggingId === next.draggingId
+    && prev.isSelected === next.isSelected;
 });
