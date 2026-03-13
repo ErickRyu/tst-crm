@@ -179,7 +179,7 @@ export function LeadDrawer({
       <SheetContent
         side="right"
         showCloseButton={false}
-        className="w-full sm:max-w-none md:w-[480px] p-0 gap-0 flex flex-col max-md:inset-x-0 max-md:inset-y-auto max-md:bottom-0 max-md:top-auto max-md:h-auto max-md:max-h-[90vh] max-md:rounded-t-2xl max-md:data-[state=open]:slide-in-from-bottom max-md:data-[state=closed]:slide-out-to-bottom max-md:![--tw-enter-translate-x:0] max-md:![--tw-exit-translate-x:0]"
+        className="w-full sm:max-w-none md:w-[480px] p-0 gap-0 flex flex-col max-md:inset-x-0 max-md:inset-y-auto max-md:bottom-0 max-md:top-auto max-md:h-[85vh] max-md:rounded-t-2xl max-md:data-[state=open]:slide-in-from-bottom max-md:data-[state=closed]:slide-out-to-bottom max-md:![--tw-enter-translate-x:0] max-md:![--tw-exit-translate-x:0]"
       >
         {/* Mobile drag handle */}
         <div className="flex justify-center pt-2 pb-1 md:hidden"><div className="w-10 h-1 rounded-full bg-slate-300"></div></div>
