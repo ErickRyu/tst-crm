@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { userTelegramRecipients } from "@/lib/schema";
 import { requireAuth } from "@/lib/auth-helpers";
+import { encrypt } from "@/lib/crypto";
 
 export async function POST(request: NextRequest) {
   const authResult = await requireAuth();
@@ -9,7 +10,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { chatId, label, chatType } = body;
+    const { chatId, label, chatType, botToken } = body;
 
     if (!chatId || !label) {
       return NextResponse.json(
@@ -25,6 +26,7 @@ export async function POST(request: NextRequest) {
         chatId: String(chatId),
         label: String(label),
         chatType: chatType ? String(chatType) : null,
+        botToken: botToken ? encrypt(String(botToken)) : null,
       })
       .returning();
 

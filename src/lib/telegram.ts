@@ -5,14 +5,13 @@ import { decrypt } from "@/lib/crypto";
 import * as Sentry from "@sentry/nextjs";
 
 type TelegramRecipientRow = InferSelectModel<typeof telegramRecipients>;
-type UserTelegramRecipientRow = InferSelectModel<typeof userTelegramRecipients>;
-
 interface TelegramRecipient {
   id: number;
   chatId: string;
   label: string;
   chatType: string | null;
   isEnabled: number;
+  botToken?: string | null;
 }
 
 interface TelegramSettings {
@@ -141,19 +140,25 @@ function formatTime(date: Date | string): string {
 }
 
 async function sendToAllRecipients(
-  botToken: string,
+  fallbackBotToken: string | null,
   recipients: TelegramRecipient[],
   text: string,
   context: string
 ): Promise<void> {
   const activeRecipients = recipients.filter((r) => r.isEnabled === 1);
   if (activeRecipients.length === 0) {
-    console.log(`[Telegram] ${context} skipped — no active recipients`);
+    console.info(`[Telegram] ${context} skipped — no active recipients`);
     return;
   }
 
   const results = await Promise.allSettled(
-    activeRecipients.map((r) => sendTelegramMessage(botToken, r.chatId, text))
+    activeRecipients.map((r) => {
+      const token = r.botToken || fallbackBotToken;
+      if (!token) {
+        return Promise.reject(new Error("no bot token"));
+      }
+      return sendTelegramMessage(token, r.chatId, text);
+    })
   );
 
   results.forEach((result, idx) => {
@@ -216,11 +221,19 @@ async function getEnabledUserTelegramConfigs(): Promise<UserTelegramConfig[]> {
       .from(userTelegramRecipients)
       .where(inArray(userTelegramRecipients.userId, userIds));
 
-    // userId 기준으로 그룹핑
+    // userId 기준으로 그룹핑 (수신자별 botToken 복호화)
     const recipientsByUser = new Map<number, TelegramRecipient[]>();
     for (const r of allRecipientRows) {
+      let recipientBotToken: string | null = null;
+      if (r.botToken) {
+        try {
+          recipientBotToken = decrypt(r.botToken);
+        } catch {
+          // 복호화 실패 시 fallback으로 user-level 토큰 사용
+        }
+      }
       const list = recipientsByUser.get(r.userId) ?? [];
-      list.push({ id: r.id, chatId: r.chatId, label: r.label, chatType: r.chatType, isEnabled: r.isEnabled });
+      list.push({ id: r.id, chatId: r.chatId, label: r.label, chatType: r.chatType, isEnabled: r.isEnabled, botToken: recipientBotToken });
       recipientsByUser.set(r.userId, list);
     }
 
@@ -269,7 +282,7 @@ export async function notifyNewLead(lead: NewLeadData): Promise<void> {
 
   const userConfigs = await getEnabledUserTelegramConfigs();
   if (userConfigs.length === 0) {
-    console.log("[Telegram] notifyNewLead skipped — no enabled user configs");
+    console.info("[Telegram] notifyNewLead skipped — no enabled user configs");
     return;
   }
 
@@ -299,7 +312,7 @@ export async function notifyStatusChange(data: StatusChangeData): Promise<void> 
 
   const userConfigs = await getEnabledUserTelegramConfigs();
   if (userConfigs.length === 0) {
-    console.log("[Telegram] notifyStatusChange skipped — no enabled user configs");
+    console.info("[Telegram] notifyStatusChange skipped — no enabled user configs");
     return;
   }
 

@@ -159,6 +159,7 @@ export const userTelegramRecipients = pgTable("user_telegram_recipients", {
   chatId: text("chat_id").notNull(),
   label: text("label").notNull(),
   chatType: text("chat_type"),
+  botToken: text("bot_token"),
   isEnabled: integer("is_enabled").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

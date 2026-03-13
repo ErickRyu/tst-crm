@@ -13,6 +13,7 @@ interface Recipient {
   label: string;
   chatType: string | null;
   isEnabled: boolean;
+  botToken?: string;
 }
 
 interface DetectedChat {
@@ -90,30 +91,29 @@ export function MyTelegramSettings() {
     fetchSettings();
   }, [fetchSettings]);
 
-  const hasToken = !!settings.botToken && settings.botToken !== "***";
+  const [tokenVerified, setTokenVerified] = useState(false);
+
+  const hasToken = tokenVerified || (!!settings.botToken && settings.botToken !== "***");
   const hasRecipients = settings.recipients.length > 0;
 
-  const saveToken = async () => {
+  const verifyToken = async () => {
     if (!newToken.trim()) {
       toast.error("Bot Token을 입력해주세요.");
       return;
     }
     setSavingToken(true);
     try {
-      const res = await fetch("/api/crm/my-telegram/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ botToken: newToken }),
-      });
-      if (res.ok) {
-        toast.success("Bot Token이 저장되었습니다.");
-        setNewToken("");
-        await fetchSettings();
+      // getMe로 봇 토큰 유효성 검증
+      const res = await fetch(`https://api.telegram.org/bot${newToken.trim()}/getMe`);
+      const data = await res.json();
+      if (data.ok) {
+        toast.success(`봇 확인: @${data.result.username}`);
+        setTokenVerified(true);
       } else {
-        toast.error("토큰 저장 실패");
+        toast.error(`유효하지 않은 토큰: ${data.description || "확인 실패"}`);
       }
     } catch {
-      toast.error("토큰 저장 실패");
+      toast.error("토큰 검증 실패. 네트워크를 확인해주세요.");
     } finally {
       setSavingToken(false);
     }
@@ -127,7 +127,7 @@ export function MyTelegramSettings() {
       const res = await fetch("/api/crm/my-telegram/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "detect" }),
+        body: JSON.stringify({ action: "detect", botToken: newToken || undefined }),
       });
       const json = await res.json();
       if (res.ok && json.data) {
@@ -169,7 +169,7 @@ export function MyTelegramSettings() {
         await fetch("/api/crm/my-telegram/recipients", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chatId: String(chat.id), label, chatType: chat.type }),
+          body: JSON.stringify({ chatId: String(chat.id), label, chatType: chat.type, botToken: newToken || undefined }),
         });
       }
       toast.success(`${chatsToAdd.length}명의 수신자가 추가되었습니다.`);
@@ -194,7 +194,7 @@ export function MyTelegramSettings() {
       const res = await fetch("/api/crm/my-telegram/recipients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chatId: manualChatId.trim(), label: manualLabel.trim() }),
+        body: JSON.stringify({ chatId: manualChatId.trim(), label: manualLabel.trim(), botToken: newToken || undefined }),
       });
       const json = await res.json();
       if (res.ok) {
@@ -286,7 +286,7 @@ export function MyTelegramSettings() {
       const res = await fetch("/api/crm/my-telegram/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chatId }),
+        body: JSON.stringify({ chatId, recipientId: id }),
       });
       const json = await res.json();
       if (res.ok) {
@@ -329,6 +329,7 @@ export function MyTelegramSettings() {
     return <div className="text-sm text-slate-400 py-8 text-center">불러오는 중...</div>;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const stepDone = (_step: number) => false;
 
   return (
@@ -360,6 +361,7 @@ export function MyTelegramSettings() {
                     <tr>
                       <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">라벨</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">Chat ID</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">봇</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">유형</th>
                       <th className="text-center px-3 py-2 text-xs font-medium text-slate-500">활성</th>
                       <th className="text-center px-3 py-2 text-xs font-medium text-slate-500">테스트</th>
@@ -397,6 +399,7 @@ export function MyTelegramSettings() {
                           )}
                         </td>
                         <td className="px-3 py-2 font-mono text-xs text-slate-500">{r.chatId}</td>
+                        <td className="px-3 py-2 font-mono text-xs text-slate-400">{r.botToken || "-"}</td>
                         <td className="px-3 py-2 text-xs text-slate-500">
                           {r.chatType ? (CHAT_TYPE_LABELS[r.chatType] || r.chatType) : "-"}
                         </td>
@@ -447,7 +450,7 @@ export function MyTelegramSettings() {
                 size="sm"
                 variant="ghost"
                 className="-ml-2 text-slate-500 hover:text-slate-700"
-                onClick={() => { setIsAddingMode(false); setDetectedChats(null); setSelectedChats(new Set()); setNewToken(""); }}
+                onClick={() => { setIsAddingMode(false); setDetectedChats(null); setSelectedChats(new Set()); setNewToken(""); setTokenVerified(false); }}
               >
                 <span className="material-icons text-sm">arrow_back</span>
               </Button>
@@ -475,17 +478,17 @@ export function MyTelegramSettings() {
                       onChange={(e) => setNewToken(e.target.value)}
                       placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
                       className="max-w-md font-mono text-sm"
-                      onKeyDown={(e) => { if (e.key === "Enter") saveToken(); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") verifyToken(); }}
                     />
-                    <Button size="sm" onClick={saveToken} disabled={savingToken || !newToken.trim()}>
-                      {savingToken ? "저장 중..." : "토큰 저장"}
+                    <Button size="sm" onClick={verifyToken} disabled={savingToken || !newToken.trim()}>
+                      {savingToken ? "확인 중..." : tokenVerified ? "확인됨 ✓" : "토큰 확인"}
                     </Button>
                   </div>
                   <p className="text-xs text-slate-400 mt-1.5">
                     <a href="https://core.telegram.org/bots#how-do-i-create-a-bot" target="_blank" rel="noopener noreferrer" className="text-primary underline">
                       봇 생성 방법 안내
                     </a>
-                    {" "}— 각 상담사가 개인 봇을 사용합니다.
+                    {" "}— 수신자마다 개별 봇 토큰을 사용합니다.
                   </p>
                 </div>
               </div>

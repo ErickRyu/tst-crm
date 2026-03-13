@@ -48,13 +48,24 @@ export async function GET() {
         enabled: settings?.enabled === 1,
         notifyNewLead: settings ? settings.notifyNewLead === 1 : true,
         notifyStatusChange: settings ? settings.notifyStatusChange === 1 : true,
-        recipients: recipients.map((r: UserTelegramRecipientRow) => ({
-          id: r.id,
-          chatId: r.chatId,
-          label: r.label,
-          chatType: r.chatType,
-          isEnabled: r.isEnabled === 1,
-        })),
+        recipients: recipients.map((r: UserTelegramRecipientRow) => {
+          let recipientBotToken = "";
+          if (r.botToken) {
+            try {
+              recipientBotToken = maskToken(decrypt(r.botToken));
+            } catch {
+              recipientBotToken = "***";
+            }
+          }
+          return {
+            id: r.id,
+            chatId: r.chatId,
+            label: r.label,
+            chatType: r.chatType,
+            isEnabled: r.isEnabled === 1,
+            botToken: recipientBotToken,
+          };
+        }),
       },
     });
   } catch {
