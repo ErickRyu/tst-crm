@@ -51,6 +51,7 @@ export function CrmShell() {
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const hasLoaded = useRef(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const { start: startLoading, stop: stopLoading } = useLoading();
   const apiKey = process.env.NEXT_PUBLIC_API_KEY || "";
   const authEnabled = process.env.NEXT_PUBLIC_AUTH_ENABLED !== "false";
@@ -109,6 +110,10 @@ export function CrmShell() {
   }, []);
 
   const fetchLeads = useCallback(async () => {
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    const signal = abortRef.current.signal;
+
     const qs = new URLSearchParams({
       scope,
       includeDone: "true",
@@ -129,7 +134,7 @@ export function CrmShell() {
       qs.set("limit", "300");
     }
 
-    const res = await fetch(`/api/crm/leads?${qs.toString()}`);
+    const res = await fetch(`/api/crm/leads?${qs.toString()}`, { signal });
     const json = await res.json();
     if (!res.ok) throw new Error(json.message || "리드 조회 실패");
     const newLeads = (json.data || []) as Lead[];
@@ -156,6 +161,7 @@ export function CrmShell() {
       await Promise.all([fetchLeads(), fetchCalendar()]);
       hasLoaded.current = true;
     } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       const msg = e instanceof Error ? e.message : "조회 중 오류";
       setError(msg);
       toast.error(msg, { action: { label: "재시도", onClick: refreshAll } });
