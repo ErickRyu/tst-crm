@@ -29,6 +29,13 @@ const chain: Record<string, unknown> = {
 
 vi.mock("@/lib/db", () => ({ db: chain }));
 
+vi.mock("@/lib/auth-helpers", () => ({
+  requireAuth: vi.fn().mockResolvedValue({
+    error: null,
+    user: { id: 1, name: "테스트", email: "test@test.com", role: "ADMIN" },
+  }),
+}));
+
 // Mock sendSms
 const mockSendSms = vi.fn();
 vi.mock("@/lib/sms", () => ({

@@ -4,10 +4,14 @@ import { db } from "@/lib/db";
 import { leads, leadMemos } from "@/lib/schema";
 import { memoCreateSchema } from "@/lib/validation";
 import { logActivity } from "@/lib/activity-log";
+import { requireAuth } from "@/lib/auth-helpers";
 
 type Params = { params: Promise<{ leadId: string }> };
 
 export async function GET(_request: NextRequest, { params }: Params) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   const { leadId } = await params;
   const id = Number.parseInt(leadId, 10);
   if (Number.isNaN(id)) {
@@ -25,6 +29,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   const { leadId } = await params;
   const id = Number.parseInt(leadId, 10);
   if (Number.isNaN(id)) {
@@ -58,7 +65,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         .update(leadMemos)
         .set({
           body: parsed.data.body,
-          authorName: parsed.data.authorName,
+          authorName: authResult.user.name,
           version: sql`${leadMemos.version} + 1`,
           updatedAt: new Date(),
         })
@@ -68,7 +75,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     } else {
       const [created] = await db
         .insert(leadMemos)
-        .values({ leadId: id, authorName: parsed.data.authorName, body: parsed.data.body })
+        .values({ leadId: id, authorName: authResult.user.name, body: parsed.data.body })
         .returning();
       memo = created;
     }
@@ -77,7 +84,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     logActivity({
       leadId: id,
       action: "memo_save",
-      actorName: parsed.data.authorName,
+      actorName: authResult.user.name,
       detail: existing ? "메모 수정" : "메모 작성",
     }).catch(console.error);
 

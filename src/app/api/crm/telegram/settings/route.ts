@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { crmSettings } from "@/lib/schema";
-import { eq } from "drizzle-orm";
+import { crmSettings, telegramRecipients } from "@/lib/schema";
+import { eq, InferSelectModel } from "drizzle-orm";
 import { encrypt, decrypt } from "@/lib/crypto";
+import { requireAuth } from "@/lib/auth-helpers";
+
+type TelegramRecipientRow = InferSelectModel<typeof telegramRecipients>;
 
 const TELEGRAM_KEYS = [
   "telegram_bot_token",
-  "telegram_chat_id",
   "telegram_enabled",
   "telegram_notify_new_lead",
   "telegram_notify_status_change",
@@ -24,6 +26,9 @@ function maskToken(token: string): string {
 }
 
 export async function GET() {
+  const authResult = await requireAuth(["ADMIN"]);
+  if (authResult.error) return authResult.error;
+
   try {
     const rows = await db.select().from(crmSettings);
     const result: Record<string, string> = {};
@@ -43,13 +48,31 @@ export async function GET() {
       }
     }
 
-    return NextResponse.json({ code: 200, message: "텔레그램 설정 조회 성공", data: result });
+    const recipientRows = await db.select().from(telegramRecipients);
+
+    return NextResponse.json({
+      code: 200,
+      message: "텔레그램 설정 조회 성공",
+      data: {
+        ...result,
+        recipients: recipientRows.map((r: TelegramRecipientRow) => ({
+          id: r.id,
+          chatId: r.chatId,
+          label: r.label,
+          chatType: r.chatType,
+          isEnabled: r.isEnabled === 1,
+        })),
+      },
+    });
   } catch {
     return NextResponse.json({ code: 500, message: "설정 조회 실패" }, { status: 500 });
   }
 }
 
 export async function PATCH(request: NextRequest) {
+  const authResult = await requireAuth(["ADMIN"]);
+  if (authResult.error) return authResult.error;
+
   try {
     const body = await request.json();
     if (typeof body !== "object" || body === null) {

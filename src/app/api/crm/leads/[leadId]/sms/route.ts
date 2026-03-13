@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { leads, smsLogs } from "@/lib/schema";
 import { sendSms } from "@/lib/sms";
+import { requireAuth } from "@/lib/auth-helpers";
 import { z } from "zod";
 
 type Params = { params: Promise<{ leadId: string }> };
@@ -16,6 +17,9 @@ const smsSendSchema = z.object({
 });
 
 export async function POST(request: NextRequest, { params }: Params) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   const { leadId } = await params;
   const id = Number.parseInt(leadId, 10);
   if (Number.isNaN(id)) {
@@ -66,7 +70,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         body: parsed.data.msg,
         msgType: parsed.data.msgType || "SMS",
         status,
-        senderName: parsed.data.senderName,
+        senderName: authResult.user.name,
         msgId: result.msg_id || null,
         errorMessage: !isSuccess ? result.message : null,
       })
@@ -96,6 +100,9 @@ export async function POST(request: NextRequest, { params }: Params) {
 
 // GET: 해당 리드의 SMS 발송 이력
 export async function GET(_request: NextRequest, { params }: Params) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   const { leadId } = await params;
   const id = Number.parseInt(leadId, 10);
   if (Number.isNaN(id)) {

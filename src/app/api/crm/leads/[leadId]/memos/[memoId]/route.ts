@@ -3,10 +3,14 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { leadMemos } from "@/lib/schema";
 import { memoUpdateSchema } from "@/lib/validation";
+import { requireAuth } from "@/lib/auth-helpers";
 
 type Params = { params: Promise<{ leadId: string; memoId: string }> };
 
 export async function PATCH(request: NextRequest, { params }: Params) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   const { leadId, memoId } = await params;
   const lid = Number.parseInt(leadId, 10);
   const mid = Number.parseInt(memoId, 10);
@@ -35,6 +39,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_request: NextRequest, { params }: Params) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   const { leadId, memoId } = await params;
   const lid = Number.parseInt(leadId, 10);
   const mid = Number.parseInt(memoId, 10);

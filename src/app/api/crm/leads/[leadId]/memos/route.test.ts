@@ -29,6 +29,13 @@ const chain: Record<string, unknown> = {
 
 vi.mock("@/lib/db", () => ({ db: chain }));
 
+vi.mock("@/lib/auth-helpers", () => ({
+  requireAuth: vi.fn().mockResolvedValue({
+    error: null,
+    user: { id: 1, name: "테스트", email: "test@test.com", role: "ADMIN" },
+  }),
+}));
+
 vi.mock("drizzle-orm", async () => {
   const actual = await vi.importActual<typeof import("drizzle-orm")>("drizzle-orm");
   return { ...actual };
@@ -105,16 +112,6 @@ describe("POST /api/crm/leads/[leadId]/memos", () => {
       headers: { "Content-Type": "application/json" },
     });
     const res = await POST(req, makeParams("abc"));
-    expect(res.status).toBe(400);
-  });
-
-  it("authorName이 빈 문자열이면 400을 반환해야 한다", async () => {
-    const req = new NextRequest("http://localhost/api/crm/leads/1/memos", {
-      method: "POST",
-      body: JSON.stringify({ authorName: "", body: "메모" }),
-      headers: { "Content-Type": "application/json" },
-    });
-    const res = await POST(req, makeParams("1"));
     expect(res.status).toBe(400);
   });
 

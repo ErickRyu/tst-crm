@@ -3,6 +3,8 @@ import { and, desc, eq, inArray, SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { leads, leadMemos, users } from "@/lib/schema";
 import { ACTIONABLE_STATUSES } from "@/lib/crm";
+import { TIMEZONE } from "@/lib/date";
+import { requireAuth } from "@/lib/auth-helpers";
 import * as XLSX from "xlsx";
 
 function parseBoolean(value: string | null, fallback: boolean) {
@@ -14,17 +16,20 @@ function formatDate(d: Date | string | null): string {
   if (!d) return "";
   const date = d instanceof Date ? d : new Date(d);
   if (isNaN(date.getTime())) return "";
-  return date.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
+  return date.toLocaleString("ko-KR", { timeZone: TIMEZONE });
 }
 
 function formatDateOnly(d: Date | string | null): string {
   if (!d) return "";
   const date = d instanceof Date ? d : new Date(d);
   if (isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
+  return date.toLocaleDateString("ko-KR", { timeZone: TIMEZONE });
 }
 
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   try {
     const { searchParams } = new URL(request.url);
 
@@ -65,17 +70,15 @@ export async function GET(request: NextRequest) {
 
     // 중복 제거 (LEFT JOIN으로 메모가 여러 개인 리드)
     const seen = new Set<number>();
-    const data = rows.reduce<
-      { lead: typeof leads.$inferSelect; memoBody: string | null; assigneeName: string | null }[]
-    >((acc, r) => {
+    const data: typeof rows = [];
+    for (const r of rows) {
       if (!seen.has(r.lead.id)) {
         seen.add(r.lead.id);
-        acc.push(r);
+        data.push(r);
       }
-      return acc;
-    }, []);
+    }
 
-    const excelData = data.map((r) => ({
+    const excelData = data.map((r: typeof rows[number]) => ({
       이름: r.lead.name || "",
       전화번호: r.lead.phone || "",
       나이: r.lead.age ?? "",
@@ -132,7 +135,7 @@ export async function GET(request: NextRequest) {
     const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 
     const today = new Date()
-      .toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })
+      .toLocaleDateString("ko-KR", { timeZone: TIMEZONE })
       .replace(/\. /g, "-")
       .replace(/\./g, "");
     const filename = `CRM_리드목록_${today}.xlsx`;

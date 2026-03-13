@@ -7,10 +7,15 @@ import { crmStatusUpdateSchema } from "@/lib/validation";
 import { executeAutoSend } from "@/lib/auto-send";
 import { logActivity } from "@/lib/activity-log";
 import { notifyStatusChange } from "@/lib/telegram";
+import { requireAuth } from "@/lib/auth-helpers";
+import * as Sentry from "@sentry/nextjs";
 
 type Params = { params: Promise<{ leadId: string }> };
 
 export async function PATCH(request: NextRequest, { params }: Params) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   const { leadId } = await params;
   const id = Number.parseInt(leadId, 10);
 
@@ -90,7 +95,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     logActivity({
       leadId: id,
       action: "status_change",
-      actorName: parsed.data.actorName || "시스템",
+      actorName: authResult.user.name,
       oldValue: from,
       newValue: to,
       detail: `상태 변경: ${from} → ${to}`,
@@ -102,8 +107,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       leadName: updated.name,
       from,
       to,
-      actorName: parsed.data.actorName || "시스템",
-    }).catch(console.error);
+      actorName: authResult.user.name,
+    }).catch((err) => {
+      console.error(err);
+      Sentry.captureException(err);
+    });
 
     // Fire-and-forget: auto-send for absent statuses
     const absentStatuses = ["1차부재", "2차부재", "3차부재"];

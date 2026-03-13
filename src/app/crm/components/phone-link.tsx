@@ -2,15 +2,36 @@
 
 import { useState } from "react";
 
-export function downloadVCard(name: string, phone: string) {
-  const vcard = `BEGIN:VCARD\nVERSION:3.0\nFN:${name}\nTEL;TYPE=CELL:${phone}\nEND:VCARD`;
-  const blob = new Blob([vcard], { type: "text/vcard;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${name}.vcf`;
-  a.click();
-  URL.revokeObjectURL(url);
+export function downloadVCard(name: string, phone: string, clinicName?: string) {
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  if (isMobile) {
+    // 모바일: API 엔드포인트로 이동하면 연락처 저장 화면이 바로 뜸
+    const params = new URLSearchParams({ name, phone });
+    if (clinicName) params.set("org", clinicName);
+    window.location.href = `/api/crm/vcard?${params.toString()}`;
+  } else {
+    // 데스크탑: .vcf 파일 다운로드
+    const lines = [
+      "BEGIN:VCARD",
+      "VERSION:3.0",
+      `FN:${name}`,
+      `N:${name};;;;`,
+      `TEL;TYPE=CELL:${phone}`,
+    ];
+    if (clinicName) lines.push(`ORG:${clinicName}`);
+    lines.push(`NOTE:${clinicName ? clinicName + " " : ""}문의 환자`);
+    lines.push("END:VCARD");
+    const vcard = lines.join("\r\n");
+
+    const blob = new Blob([vcard], { type: "text/vcard;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${name}.vcf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 }
 
 export function PhoneLink({ phone, className = "" }: { phone: string; className?: string }) {

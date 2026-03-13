@@ -5,6 +5,7 @@ import { leadCreateSchema } from "@/lib/validation";
 import { eq, and, sql, gte, lt, SQL } from "drizzle-orm";
 import { executeAutoSend } from "@/lib/auto-send";
 import { notifyNewLead } from "@/lib/telegram";
+import * as Sentry from "@sentry/nextjs";
 
 export async function POST(request: NextRequest) {
   try {
@@ -89,7 +90,10 @@ export async function POST(request: NextRequest) {
       category: created.category,
       site: created.site,
       createdAt: created.createdAt,
-    }).catch(console.error);
+    }).catch((err) => {
+      console.error(err);
+      Sentry.captureException(err);
+    });
 
     return NextResponse.json(
       { code: 201, message: "리드가 등록되었습니다.", data: created },

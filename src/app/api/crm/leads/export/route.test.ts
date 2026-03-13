@@ -26,6 +26,13 @@ const chain: Record<string, unknown> = {
 
 vi.mock("@/lib/db", () => ({ db: chain }));
 
+vi.mock("@/lib/auth-helpers", () => ({
+  requireAuth: vi.fn().mockResolvedValue({
+    error: null,
+    user: { id: 1, name: "테스트", email: "test@test.com", role: "ADMIN" },
+  }),
+}));
+
 vi.mock("drizzle-orm", async () => {
   const actual = await vi.importActual<typeof import("drizzle-orm")>("drizzle-orm");
   return { ...actual };
@@ -125,7 +132,7 @@ describe("GET /api/crm/leads/export", () => {
     const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { header: 1 });
 
     // 1행: 헤더
-    const headers = data[0] as string[];
+    const headers = data[0] as unknown as string[];
     expect(headers).toEqual(EXPECTED_HEADERS);
   });
 

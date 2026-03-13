@@ -4,8 +4,12 @@ import { smsTemplates } from "@/lib/schema";
 import { eq, or, asc } from "drizzle-orm";
 import { smsTemplateCreateSchema } from "@/lib/validation";
 import { calcMsgType } from "@/lib/sms";
+import { requireAuth } from "@/lib/auth-helpers";
 
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   try {
     const includeDisabledDefaults =
       request.nextUrl.searchParams.get("includeDisabledDefaults") === "true";
@@ -20,7 +24,7 @@ export async function GET(request: NextRequest) {
       .where(whereClause)
       .orderBy(asc(smsTemplates.sortOrder), asc(smsTemplates.id));
 
-    const data = templates.map((t) => {
+    const data = templates.map((t: typeof templates[number]) => {
       const { byteLength, msgType } = calcMsgType(t.body);
       return {
         id: t.id,
@@ -54,6 +58,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth(["ADMIN"]);
+  if (authResult.error) return authResult.error;
+
   try {
     const body = await request.json();
     const parsed = smsTemplateCreateSchema.safeParse(body);

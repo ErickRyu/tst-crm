@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { leadActivities, smsLogs } from "@/lib/schema";
+import { requireAuth } from "@/lib/auth-helpers";
 
 type Params = { params: Promise<{ leadId: string }> };
 
 export async function GET(_request: NextRequest, { params }: Params) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   const { leadId } = await params;
   const id = Number.parseInt(leadId, 10);
 
@@ -30,7 +34,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
   ]);
 
   const timeline = [
-    ...activities.map((a) => ({
+    ...activities.map((a: typeof activities[number]) => ({
       id: `activity-${a.id}`,
       type: a.action,
       actorName: a.actorName,
@@ -40,7 +44,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
       newValue: a.newValue,
       createdAt: a.createdAt.toISOString(),
     })),
-    ...sms.map((s) => {
+    ...sms.map((s: typeof sms[number]) => {
       const prefix = `SMS ${s.status === "sent" ? "발송" : s.status === "test" ? "테스트 발송" : "실패"}: `;
       const summary = `${prefix}${s.body.slice(0, 50)}${s.body.length > 50 ? "..." : ""}`;
       const full = `${prefix}${s.body}`;

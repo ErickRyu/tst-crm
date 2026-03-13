@@ -4,10 +4,14 @@ import { smsTemplates } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { smsTemplateUpdateSchema } from "@/lib/validation";
 import { calcMsgType } from "@/lib/sms";
+import { requireAuth } from "@/lib/auth-helpers";
 
 type Params = { params: Promise<{ templateId: string }> };
 
 export async function PATCH(request: NextRequest, { params }: Params) {
+  const authResult = await requireAuth(["ADMIN"]);
+  if (authResult.error) return authResult.error;
+
   const { templateId } = await params;
   const id = Number.parseInt(templateId, 10);
   if (Number.isNaN(id)) {
@@ -53,6 +57,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
+  const authResult = await requireAuth(["ADMIN"]);
+  if (authResult.error) return authResult.error;
+
   const { templateId } = await params;
   const id = Number.parseInt(templateId, 10);
   if (Number.isNaN(id)) {

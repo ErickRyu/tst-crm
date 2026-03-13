@@ -3,8 +3,12 @@ import { db } from "@/lib/db";
 import { autoSendRules, smsTemplates } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { autoSendRuleCreateSchema } from "@/lib/validation";
+import { requireAuth } from "@/lib/auth-helpers";
 
 export async function GET() {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   try {
     const rules = await db
       .select({
@@ -32,6 +36,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth(["ADMIN"]);
+  if (authResult.error) return authResult.error;
+
   try {
     const body = await request.json();
     const parsed = autoSendRuleCreateSchema.safeParse(body);

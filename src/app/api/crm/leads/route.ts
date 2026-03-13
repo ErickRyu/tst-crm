@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql, SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { parseDateAsKST } from "@/lib/date";
 import { leads, leadMemos } from "@/lib/schema";
+import { requireAuth } from "@/lib/auth-helpers";
 import {
   ACTIONABLE_STATUSES,
   CRM_PRIORITY,
@@ -35,6 +37,9 @@ function serializeLead(row: typeof leads.$inferSelect, memoBody: string | null) 
 }
 
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth();
+  if (authResult.error) return authResult.error;
+
   try {
     const { searchParams } = new URL(request.url);
 
@@ -58,13 +63,13 @@ export async function GET(request: NextRequest) {
     const conditions: SQL[] = [];
 
     if (fromParam) {
-      const fromDate = new Date(fromParam);
+      const fromDate = parseDateAsKST(fromParam);
       if (!Number.isNaN(fromDate.getTime())) {
         conditions.push(gte(leads.createdAt, fromDate));
       }
     }
     if (toParam) {
-      const toDate = new Date(toParam);
+      const toDate = parseDateAsKST(toParam);
       if (!Number.isNaN(toDate.getTime())) {
         // to 날짜의 끝(다음날 자정)까지 포함
         toDate.setDate(toDate.getDate() + 1);
@@ -128,13 +133,13 @@ export async function GET(request: NextRequest) {
 
     // LEFT JOIN으로 메모가 여러 개인 리드가 중복될 수 있으므로 첫 행만 사용
     const seen = new Set<number>();
-    const data = rows.reduce<ReturnType<typeof serializeLead>[]>((acc, r) => {
+    const data: ReturnType<typeof serializeLead>[] = [];
+    for (const r of rows) {
       if (!seen.has(r.lead.id)) {
         seen.add(r.lead.id);
-        acc.push(serializeLead(r.lead, r.memoBody));
+        data.push(serializeLead(r.lead, r.memoBody));
       }
-      return acc;
-    }, []);
+    }
 
     return NextResponse.json({
       code: 200,

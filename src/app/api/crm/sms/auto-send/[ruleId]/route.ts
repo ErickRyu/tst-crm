@@ -3,10 +3,14 @@ import { db } from "@/lib/db";
 import { autoSendRules } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { autoSendRuleUpdateSchema } from "@/lib/validation";
+import { requireAuth } from "@/lib/auth-helpers";
 
 type Params = { params: Promise<{ ruleId: string }> };
 
 export async function PATCH(request: NextRequest, { params }: Params) {
+  const authResult = await requireAuth(["ADMIN"]);
+  if (authResult.error) return authResult.error;
+
   const { ruleId } = await params;
   const id = Number.parseInt(ruleId, 10);
   if (Number.isNaN(id)) {
@@ -46,6 +50,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
+  const authResult = await requireAuth(["ADMIN"]);
+  if (authResult.error) return authResult.error;
+
   const { ruleId } = await params;
   const id = Number.parseInt(ruleId, 10);
   if (Number.isNaN(id)) {

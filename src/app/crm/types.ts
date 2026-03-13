@@ -33,6 +33,9 @@ export const kanbanStatusOptions: CrmStatus[] = [
 export interface User {
   id: number;
   name: string;
+  email?: string;
+  role?: "ADMIN" | "COUNSELOR" | "HOSPITAL_STAFF";
+  status?: "ACTIVE" | "INACTIVE";
 }
 
 export interface Lead {
@@ -111,6 +114,13 @@ export interface PaginationProps {
   onPageSizeChange: (size: number) => void;
 }
 
+export interface BulkSelectionProps {
+  selectedLeadIds: Set<number>;
+  onToggleSelect: (id: number) => void;
+  onSelectAll: (ids: number[]) => void;
+  onDeselectAll: () => void;
+}
+
 export interface ViewProps {
   leads: Lead[];
   users: User[];
@@ -121,6 +131,7 @@ export interface ViewProps {
   onSchedule: (id: number, field: string, val: string) => Promise<void>;
   loading?: boolean;
   pagination?: PaginationProps;
+  bulk?: BulkSelectionProps;
 }
 
 export interface KanbanProps {
@@ -137,6 +148,7 @@ export interface KanbanProps {
   doneTotalCounts: Record<string, number>;
   kanbanDoneDays: 7 | 30 | null;
   onKanbanDoneDaysChange: (v: 7 | 30 | null) => void;
+  bulk?: BulkSelectionProps;
 }
 
 export function toIsoLocal(datetime: string | null) {

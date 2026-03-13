@@ -1,5 +1,7 @@
 import { AligoSmsProvider } from "./aligo-provider";
+import { NhnSmsProvider } from "./nhn-provider";
 import type {
+  SmsProvider,
   SmsSendResult,
   SmsTemplate,
   SmsRemainingResult,
@@ -14,7 +16,17 @@ import type {
 export type { SmsSendResult, SmsTemplate, SmsRemainingResult };
 
 // ---------- Provider Singleton ----------
-const provider = new AligoSmsProvider();
+function createProvider(): SmsProvider {
+  const providerType = process.env.SMS_PROVIDER || "aligo";
+  switch (providerType) {
+    case "nhn":
+      return new NhnSmsProvider();
+    case "aligo":
+    default:
+      return new AligoSmsProvider();
+  }
+}
+const provider = createProvider();
 
 // ---------- Templates ----------
 export const SMS_TEMPLATES: SmsTemplate[] = [
@@ -125,7 +137,7 @@ export async function getRemaining(): Promise<SmsRemainingResult> {
 }
 
 // ---------- New APIs ----------
-export async function getSmsHistory(params?: SmsHistoryRequest): Promise<SmsHistoryResult> {
+export async function getSmsHistory(params: SmsHistoryRequest = {}): Promise<SmsHistoryResult> {
   return provider.getHistory(params);
 }
 

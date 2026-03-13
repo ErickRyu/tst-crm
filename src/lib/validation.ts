@@ -78,7 +78,7 @@ export const crmStatusSchema = z.enum(crmStatusValues);
 export const crmStatusUpdateSchema = z.object({
   crmStatus: crmStatusSchema,
   version: z.number().int().positive().optional(),
-  actorName: z.string().min(1).max(50).optional(),
+  actorName: z.string().max(50).optional(),
 });
 
 const isoDateTime = z
@@ -90,17 +90,17 @@ export const crmScheduleUpdateSchema = z.object({
   followUpAt: z.union([isoDateTime, z.null()]).optional(),
   appointmentAt: z.union([isoDateTime, z.null()]).optional(),
   version: z.number().int().positive().optional(),
-  actorName: z.string().min(1).max(50).optional(),
+  actorName: z.string().max(50).optional(),
 });
 
 export const crmAssignSchema = z.object({
   assigneeId: z.number().int().positive().nullable(),
   version: z.number().int().positive().optional(),
-  actorName: z.string().min(1).max(50).optional(),
+  actorName: z.string().max(50).optional(),
 });
 
 export const memoCreateSchema = z.object({
-  authorName: z.string().min(1).max(50),
+  authorName: z.string().max(50).optional(),
   body: z.string().min(1).max(2000),
 });
 
@@ -147,6 +147,27 @@ export const autoSendRuleUpdateSchema = z.object({
   isEnabled: z.boolean().optional(),
 });
 
+// --- Bulk operation schemas ---
+export const bulkStatusUpdateSchema = z.object({
+  leadIds: z.array(z.number().int().positive()).min(1).max(100),
+  crmStatus: crmStatusSchema,
+  actorName: z.string().max(50).optional(),
+});
+
+export const bulkAssignSchema = z.object({
+  leadIds: z.array(z.number().int().positive()).min(1).max(100),
+  assigneeId: z.number().int().positive().nullable(),
+  actorName: z.string().max(50).optional(),
+});
+
+export const bulkSmsSchema = z.object({
+  leadIds: z.array(z.number().int().positive()).min(1).max(50),
+  msg: z.string().min(1, "메시지 내용은 필수입니다.").max(2000),
+  templateKey: z.string().optional(),
+  msgType: z.enum(["SMS", "LMS"]).optional(),
+  senderName: z.string().min(1).max(50),
+});
+
 // --- CRM Settings schemas ---
 export const crmSettingsUpdateSchema = z.record(z.string(), z.string());
 
@@ -154,5 +175,15 @@ export const crmSettingsUpdateSchema = z.record(z.string(), z.string());
 export const crmUserUpdateSchema = z.object({
   name: z.string().min(1).optional(),
   phone: z.string().nullable().optional(),
+  isActive: z.number().int().min(0).max(1).optional(),
+});
+
+// --- Admin user update ---
+export const adminUserUpdateSchema = z.object({
+  name: z.string().min(1).max(50).optional(),
+  phone: z.string().max(20).nullable().optional(),
+  email: z.string().email("유효한 이메일을 입력하세요.").optional(),
+  role: z.enum(["ADMIN", "COUNSELOR", "HOSPITAL_STAFF"]).optional(),
+  status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
   isActive: z.number().int().min(0).max(1).optional(),
 });

@@ -130,7 +130,7 @@ export async function executeAutoSend(
 
   // Dedup by ruleId
   const uniqueRules = Array.from(
-    new Map(allRules.map((r) => [r.ruleId, r])).values()
+    new Map(allRules.map((r: typeof allRules[number]) => [r.ruleId, r])).values()
   );
 
   const clinicName = await getClinicName();
@@ -146,7 +146,7 @@ export async function executeAutoSend(
     치과명: clinicName,
   };
 
-  for (const rule of uniqueRules) {
+  for (const rule of uniqueRules as typeof allRules) {
     if (!dedup(ctx.leadId, rule.ruleId)) continue;
 
     // Load template
